@@ -5,13 +5,13 @@
 import * as THREE from 'three';
 
 const DAY_PHASES = [
-  { hour: 5,  sky: 0x0e1a2e, sun: 0xffd27a, sunI: 0.35, ambient: 0x334466, ambI: 0.35 },
-  { hour: 8,  sky: 0x7ec8e8, sun: 0xfff4d8, sunI: 1.0,  ambient: 0x8899aa, ambI: 0.5 },
-  { hour: 12, sky: 0x9ad4f0, sun: 0xfff8e0, sunI: 1.15, ambient: 0x99aabb, ambI: 0.55 },
-  { hour: 16, sky: 0x6fb0d8, sun: 0xffe0a0, sunI: 0.85, ambient: 0x7788aa, ambI: 0.45 },
-  { hour: 18, sky: 0x1a2440, sun: 0xff8a4a, sunI: 0.45, ambient: 0x445588, ambI: 0.4 },
-  { hour: 20, sky: 0x0a0e1a, sun: 0x88aaff, sunI: 0.12, ambient: 0x223355, ambI: 0.35 },
-  { hour: 23, sky: 0x070a14, sun: 0xaabbff, sunI: 0.08, ambient: 0x1a2a44, ambI: 0.3 },
+  { hour: 5,  sky: 0x2a3a5e, sun: 0xffb46a, sunI: 0.45, ambient: 0x556688, ambI: 0.4 },
+  { hour: 8,  sky: 0x8ec8f0, sun: 0xfff2c8, sunI: 1.0,  ambient: 0xaabbcc, ambI: 0.5 },
+  { hour: 12, sky: 0xa8dcf8, sun: 0xfff8d8, sunI: 1.15, ambient: 0xb8c8d8, ambI: 0.55 },
+  { hour: 16, sky: 0x88c0e8, sun: 0xffd898, sunI: 0.9,  ambient: 0x99aac0, ambI: 0.5 },
+  { hour: 18, sky: 0xff9a5a, sun: 0xffb050, sunI: 0.7,  ambient: 0xcc8866, ambI: 0.55 },   // golden hour cálido
+  { hour: 20, sky: 0x2a3a6a, sun: 0xffa060, sunI: 0.3,  ambient: 0x5566aa, ambI: 0.45 },
+  { hour: 23, sky: 0x141a30, sun: 0xaabbff, sunI: 0.12, ambient: 0x334466, ambI: 0.35 },
 ];
 
 export class DayNight {
@@ -27,11 +27,11 @@ export class DayNight {
 
     // cielo
     this.skyColor = new THREE.Color(0x1a2440);
-    this.hemi = new THREE.HemisphereLight(0x8899bb, 0x2a2a33, 0.5);
+    this.hemi = new THREE.HemisphereLight(0xccddee, 0x8a7a6a, 0.6);
     ctx.scene.add(this.hemi);
 
-    // relleno ambiental suave para que las sombras no caigan a negro puro
-    this.ambient = new THREE.AmbientLight(0x334466, 0.35);
+    // relleno ambiental suave para que las sombras no caigan a negro puro (estilo cartoon)
+    this.ambient = new THREE.AmbientLight(0x445566, 0.65);
     ctx.scene.add(this.ambient);
 
     // sol (luz direccional con sombras)
@@ -95,10 +95,10 @@ export class DayNight {
     this.moon.intensity = 0.06 + (1 - Math.min(1, sunI)) * 0.18;
 
     this.hemi.color.copy(ambC);
-    this.hemi.intensity = ambI;
+    this.hemi.intensity = ambI * 1.15;
 
-    // ambient de relleno sigue el ciclo (más nocturno → menos)
-    this.ambient.intensity = 0.35 * (0.4 + 0.6 * (1 - Math.min(1, sunI)));
+    // ambient de relleno sigue el ciclo (más nocturno → menos), siempre suave
+    this.ambient.intensity = 0.65 * (0.5 + 0.5 * (1 - Math.min(1, sunI)));
 
     // factor nocturno para neones (0 día, 1 noche)
     this.nightFactor = Math.max(0, Math.min(1, (this.hour - 18.5) / 2.5 + (this.hour < 6 ? 0.6 : 0)));

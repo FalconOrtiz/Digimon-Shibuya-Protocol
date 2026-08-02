@@ -95,8 +95,8 @@ export function defaultConfig() {
       arenaRadius: 18
     },
     world: {
-      startHour: 17.5,
-      daySpeed: 0.02,     // horas por segundo real
+      startHour: 17.0,      // golden hour cálido (estilo cartoon)
+      daySpeed: 0.02,       // horas por segundo real
       spawnRadius: 60
     },
     keys: KEYBINDS,

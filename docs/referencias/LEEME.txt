@@ -19,3 +19,11 @@ ACTUALIZACION 2 (prompts de referencia aplicados):
 - Edificios: TSUTAYA al norte (neon verde), STARBUCKS al sureste (neon verde), QFRONT pantalla gigante
 - Mapa digivice: grid de coordenadas + titulo "SHIBUYA CROSSING - TOKYO" + leyenda con Hachiko
 - Imagenes de referencia FLUX: docs/referencias/shibuya-fps-vision.png y shibuya-map-vision.png
+
+ACTUALIZACION 3 (estilo cartoon Pokemon/Animal Crossing):
+- Imagenes de referencia: shibuya-fps-cartoon.png + shibuya-map-cartoon.png
+- Paleta vibrante: asfalto azulado suave (#3d4450), aceras crema calidas, cebra blanca limpia
+- Fachadas pastel vibrante (8 colores: rosa, azul, verde, lila, melocoton...)
+- Golden hour: cielo rosa-naranja, sol calido #ffb050, ambient suave (sin sombras negras duras)
+- Ropa NPCs: 10 colores vibrantes (rosa, azul, verde, naranja, lila, turquesa...)
+- Hora inicio: 17:00 (atardecer calido)

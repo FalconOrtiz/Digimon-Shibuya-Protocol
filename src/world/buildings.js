@@ -61,12 +61,16 @@ export class Buildings {
     const rng = this.rng.fork();
     const seed = rng.int(1, 999);
 
-    // base de la torre
+    // base de la torre — paleta vibrante cartoon (estilo Pokémon/AC)
+    const palette = [
+      '#e8cfa8', '#f0b8c8', '#b8d8f0', '#c8e8b8', '#f0d8a0', '#d8c8f0', '#b8e8e0', '#f0c8a8'
+    ];
     const facade = facadeTex({
-      base: ['#8a8378', '#7d7f85', '#95918a', '#6f747d'][rng.int(0, 3)],
-      frame: '#5c5750', win: '#b8d0e0', winDark: '#2e3742',
+      base: palette[rng.int(0, palette.length - 1)],
+      frame: '#c9a878',
+      win: '#a8e0f8', winDark: '#6a9ab8',
       rows: Math.max(4, Math.floor(h / 5)), cols: Math.max(3, Math.floor(w / 6)),
-      litChance: 0.3, seed, size: 512
+      litChance: 0.4, seed, size: 512
     });
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(w, h, d),
@@ -80,7 +84,7 @@ export class Buildings {
     // cornisa superior
     const cornice = new THREE.Mesh(
       new THREE.BoxGeometry(w + 0.6, 1.2, d + 0.6),
-      new THREE.MeshStandardMaterial({ color: 0x3a3a3e, roughness: 0.6, metalness: 0.3 })
+      new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.7, metalness: 0.1 })
     );
     cornice.position.y = h + 0.6;
     group.add(cornice);
@@ -98,18 +102,18 @@ export class Buildings {
       group.add(unit);
     }
 
-    // planta baja: tienda con escaparate
+    // planta baja: tienda con escaparate (cálido cartoon)
     const shop = new THREE.Mesh(
       new THREE.BoxGeometry(w * 0.94, 4.5, d * 0.94),
-      new THREE.MeshStandardMaterial({ color: 0x14161c, roughness: 0.4, metalness: 0.3 })
+      new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.6, metalness: 0.05 })
     );
     shop.position.y = 2.25;
     group.add(shop);
 
-    // escaparate luminoso
+    // escaparate luminoso cálido
     const glow = new THREE.Mesh(
       new THREE.BoxGeometry(w * 0.8, 3, d * 0.8),
-      new THREE.MeshStandardMaterial({ color: 0xfff2c0, emissive: 0xffd27a, emissiveIntensity: 0.8, roughness: 0.3 })
+      new THREE.MeshStandardMaterial({ color: 0xfff0c8, emissive: 0xffd898, emissiveIntensity: 0.9, roughness: 0.4 })
     );
     glow.position.y = 2.6;
     group.add(glow);

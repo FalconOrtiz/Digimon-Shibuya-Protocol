@@ -27,38 +27,38 @@ function hash2(x, y, seed = 0) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-// ---- asfalto: gris oscuro con speckle ----
+// ---- asfalto: gris azulado suave con speckle (estilo cartoon) ----
 export function asphaltTex(size = 256, seed = 7) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#2c2c30';
+    g.fillStyle = '#3d4450';   // asfalto cartoon: azulado suave, no negro
     g.fillRect(0, 0, s, s);
-    for (let i = 0; i < s * s * 0.6; i++) {
+    for (let i = 0; i < s * s * 0.5; i++) {
       const x = hash2(i, 1, seed) * s, y = hash2(i, 2, seed) * s;
-      const v = 30 + hash2(i, 3, seed) * 30;
-      g.fillStyle = `rgba(${v},${v},${v + 4},0.5)`;
-      g.fillRect(x, y, 1.6, 1.6);
+      const v = 52 + hash2(i, 3, seed) * 26;
+      g.fillStyle = `rgba(${v},${v + 4},${v + 10},0.5)`;
+      g.fillRect(x, y, 1.8, 1.8);
     }
-    // juntas y grietas
-    g.strokeStyle = 'rgba(15,15,18,0.5)';
-    g.lineWidth = 1;
+    // juntas y grietas suaves
+    g.strokeStyle = 'rgba(30,34,42,0.4)';
+    g.lineWidth = 1.5;
     for (let x = 0; x < s; x += 64) {
       g.beginPath(); g.moveTo(x + hash2(x, 0, seed) * 4, 0); g.lineTo(x + hash2(x, 1, seed) * 4, s); g.stroke();
     }
   });
 }
 
-// ---- acera: gris claro con juntas regulares ----
+// ---- acera: crema cálida (estilo painted) ----
 export function sidewalkTex(size = 256, seed = 3) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#9a9a9e';
+    g.fillStyle = '#c9c2b0';   // crema cálida cartoon
     g.fillRect(0, 0, s, s);
-    for (let i = 0; i < s * s * 0.4; i++) {
+    for (let i = 0; i < s * s * 0.35; i++) {
       const x = hash2(i, 4, seed) * s, y = hash2(i, 5, seed) * s;
-      const v = 140 + hash2(i, 6, seed) * 30;
-      g.fillStyle = `rgba(${v},${v},${v},0.4)`;
-      g.fillRect(x, y, 2, 2);
+      const v = 185 + hash2(i, 6, seed) * 28;
+      g.fillStyle = `rgba(${v},${v - 4},${v - 16},0.4)`;
+      g.fillRect(x, y, 2.2, 2.2);
     }
-    g.strokeStyle = 'rgba(120,120,125,0.8)';
+    g.strokeStyle = 'rgba(160,152,132,0.7)';
     g.lineWidth = 2;
     const step = s / 4;
     for (let i = 0; i <= 4; i++) {
@@ -68,40 +68,40 @@ export function sidewalkTex(size = 256, seed = 3) {
   });
 }
 
-// ---- paso de cebra (crosswalk) ----
+// ---- paso de cebra (crosswalk) cartoon ----
 export function crosswalkTex(size = 256, seed = 11) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#2c2c30';
+    g.fillStyle = '#3d4450';
     g.fillRect(0, 0, s, s);
-    // franjas blancas verticales, ligeramente desgastadas
+    // franjas blancas limpias y vibrantes
     const stripeW = s / 8;
     for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 === 0 ? '#e8e8ea' : '#2c2c30';
+      g.fillStyle = i % 2 === 0 ? '#f5f5f0' : '#3d4450';
       g.fillRect(i * stripeW, 0, stripeW, s);
     }
-    // desgaste
-    for (let i = 0; i < s * s * 0.15; i++) {
+    // desgaste sutil
+    for (let i = 0; i < s * s * 0.08; i++) {
       const x = hash2(i, 7, seed) * s, y = hash2(i, 8, seed) * s;
-      g.fillStyle = `rgba(60,60,64,${0.15 + hash2(i, 9, seed) * 0.3})`;
+      g.fillStyle = `rgba(90,95,105,${0.1 + hash2(i, 9, seed) * 0.2})`;
       g.fillRect(x, y, 3 + hash2(i, 10, seed) * 5, 2);
     }
   });
 }
 
-// ---- fachada: retícula de ventanas con variación ----
+// ---- fachada: retícula de ventanas con variación (estilo cartoon vibrante) ----
 // opts: { base, frame, win, winDark, rows, cols, litChance, seed }
 export function facadeTex(opts) {
-  const { base = '#8a8378', frame = '#6b655c', win = '#aac4d8', winDark = '#39424e',
+  const { base = '#e8cfa8', frame = '#c9a878', win = '#9ad8f0', winDark = '#6a8aa8',
           rows = 6, cols = 5, litChance = 0.35, seed = 5, size = 256 } = opts;
   return canvasTexture(size, (g, s) => {
     g.fillStyle = base;
     g.fillRect(0, 0, s, s);
-    // textura base: ruido sutil
-    for (let i = 0; i < s * s * 0.3; i++) {
+    // textura base: ruido sutil pintado
+    for (let i = 0; i < s * s * 0.25; i++) {
       const x = hash2(i, 11, seed) * s, y = hash2(i, 12, seed) * s;
-      const v = (hash2(i, 13, seed) - 0.5) * 24;
-      g.fillStyle = `rgba(${v > 0 ? v : 0},${v > 0 ? v : 0},${v > 0 ? v : 0},0.15)`;
-      g.fillRect(x, y, 2, 2);
+      const v = (hash2(i, 13, seed) - 0.5) * 18;
+      g.fillStyle = `rgba(${v > 0 ? v : 0},${v > 0 ? v : 0},${v > 0 ? v : 0},0.1)`;
+      g.fillRect(x, y, 2.5, 2.5);
     }
     const mw = s * 0.06, mh = s * 0.07;           // márgenes
     const cw = (s - mw * 2) / cols, ch = (s - mh * 2) / rows;
@@ -121,8 +121,8 @@ export function facadeTex(opts) {
         }
       }
     }
-    // desgaste por cornisas
-    g.fillStyle = 'rgba(0,0,0,0.18)';
+    // cornisas suaves
+    g.fillStyle = 'rgba(0,0,0,0.12)';
     g.fillRect(0, 0, s, 3);
     g.fillRect(0, s * 0.25, s, 1.5);
     g.fillRect(0, s * 0.5, s, 1.5);
