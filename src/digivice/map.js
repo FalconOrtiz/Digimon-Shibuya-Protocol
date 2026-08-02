@@ -25,6 +25,18 @@ export class MapPanel {
     g.fillStyle = '#0a0e1a';
     g.fillRect(0, 0, SIZE, SIZE);
 
+    // grid de coordenadas sutil (estilo prompt: mapa de juego limpio)
+    g.strokeStyle = 'rgba(80,120,200,0.08)';
+    g.lineWidth = 1;
+    for (let i = -6; i <= 6; i++) {
+      g.beginPath();
+      g.moveTo(cx + i * 24, 0); g.lineTo(cx + i * 24, SIZE);
+      g.stroke();
+      g.beginPath();
+      g.moveTo(0, cy + i * 24); g.lineTo(SIZE, cy + i * 24);
+      g.stroke();
+    }
+
     // calles (las 4 direcciones + diagonales)
     g.strokeStyle = '#1c2434';
     g.lineWidth = 14;
@@ -110,6 +122,12 @@ export class MapPanel {
     g.font = '10px monospace';
     g.textAlign = 'center';
     g.fillText('N', px(0), 12);
+
+    // título del mapa (estilo prompt)
+    g.fillStyle = '#c8d4ea';
+    g.font = 'bold 11px monospace';
+    g.textAlign = 'center';
+    g.fillText('SHIBUYA CROSSING — TOKYO', SIZE / 2, SIZE - 10);
   }
 
   render(el) {
@@ -118,7 +136,7 @@ export class MapPanel {
     el.appendChild(this.canvas);
     const legend = document.createElement('div');
     legend.className = 'dv-legend';
-    legend.innerHTML = '<span style="color:#4dd0ff">● salvaje</span> <span style="color:#ff3b6b">● rival</span> <span style="color:#7dff9a">▲ tú</span>';
+    legend.innerHTML = '<span style="color:#4dd0ff">● salvaje</span> <span style="color:#ff3b6b">● rival</span> <span style="color:#7dff9a">▲ tú</span> <span style="color:#c9a87a">● Hachiko</span>';
     el.appendChild(legend);
   }
 }

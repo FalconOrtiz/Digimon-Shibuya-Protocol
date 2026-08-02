@@ -6,7 +6,8 @@ export class TrainerProfile {
   static deps = [];
 
   constructor() {
-    this.name = 'Falcon';
+    this.name = 'FalconOrtiz';
+    this.level = 42;
     this.badges = [];
     this.wins = 0;
     this.losses = 0;

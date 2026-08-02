@@ -44,7 +44,7 @@ async function main() {
   const digivice = ctx.get('digivice');
 
   trainer.setTeam(digimonSys.party.map(m => m.species.id));
-  trainer.name = 'Falcon';
+  trainer.name = 'FalconOrtiz';
   ctx.events.emit('trainer:stats', { wins: 0, losses: 0 });
 
   // huevo inicial para el panel (demostración)
@@ -62,7 +62,7 @@ async function main() {
   // estado inicial HUD
   ctx.events.emit('player:health', { current: ctx.config.player.hp, max: ctx.config.player.hp });
   ctx.events.emit('player:stamina', { current: ctx.config.player.staminaMax, max: ctx.config.player.staminaMax });
-  ctx.events.emit('digivice:message', { text: 'Bienvenido a Shibuya, Falcon. ¡Encuentra digimons salvajes!' });
+  ctx.events.emit('digivice:message', { text: 'Bienvenido a Shibuya, FalconOrtiz. ¡Encuentra digimons salvajes!' });
 
   // debug: exponer engine para consola
   window.__game = { engine, ctx };

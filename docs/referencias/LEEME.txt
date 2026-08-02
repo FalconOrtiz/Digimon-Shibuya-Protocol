@@ -11,3 +11,11 @@ Referencia base ya aplicada en codigo (disposicion real):
 - Calles: Koen-dori (N), Miyamasuzaka (E), Dogenzaka (W), Center-gai (S), Love Hotel Hill (SW)
 - Cruce: lat 35.6595, lon 139.7005
 
+
+ACTUALIZACION 2 (prompts de referencia aplicados):
+- HUD perfil izquierda: FalconOrtiz, avatar circular, VIDA (verde), ENERGIA (azul), NIVEL 42 (dorado)
+- Panel INVENTARIO abajo-derecha: 6 slots con iconos, boton cerrar, tecla I alterna
+- Asfalto mojado reflectante (roughness 0.42, metalness 0.12) + reflejos de neon en el suelo
+- Edificios: TSUTAYA al norte (neon verde), STARBUCKS al sureste (neon verde), QFRONT pantalla gigante
+- Mapa digivice: grid de coordenadas + titulo "SHIBUYA CROSSING - TOKYO" + leyenda con Hachiko
+- Imagenes de referencia FLUX: docs/referencias/shibuya-fps-vision.png y shibuya-map-vision.png

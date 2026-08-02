@@ -36,13 +36,13 @@ export class Buildings {
       { x: bs, z: bs, h: 26, kind: 'office', neon: 'HIKARIE', led: false, w: bs * 0.92, d: bs * 0.92 },   // SE: Hikarie
       // corona exterior (calles que salen del cruce)
       { x: -bs * 2, z: -bs * 2, h: 22, kind: 'office', w: bs * 0.9, d: bs * 0.9 },   // noroeste lejano (Dogenzaka arriba)
-      { x: 0, z: -bs * 2, h: 24, kind: 'office', neon: 'KOEN-DORI', w: bs * 0.9, d: bs * 0.9 },  // norte: calle Koen-dori
+      { x: 0, z: -bs * 2, h: 24, kind: 'office', neon: 'TSUTAYA', neonColor: '#5aff7d', w: bs * 0.9, d: bs * 0.9 },  // norte: Tsutaya (franja verde)
       { x: bs * 2, z: -bs * 2, h: 28, kind: 'tower', w: bs * 0.9, d: bs * 0.9 },      // noreste lejano (Miyamasuzaka)
       { x: -bs * 2, z: 0, h: 20, kind: 'office', neon: 'DOGENZAKA', w: bs * 0.9, d: bs * 0.9 },  // oeste: Dogenzaka
       { x: bs * 2, z: 0, h: 24, kind: 'office', neon: 'MIYAMASUZAKA', w: bs * 0.9, d: bs * 0.9 },  // este: Miyamasuzaka
       { x: -bs * 2, z: bs * 2, h: 18, kind: 'retail', neon: 'LOVE HOTEL', w: bs * 0.9, d: bs * 0.9 },  // sur-oeste (Love Hotel Hill)
       { x: 0, z: bs * 2, h: 16, kind: 'retail', neon: 'CENTER-GAI', w: bs * 0.9, d: bs * 0.9 },      // sur: Center-gai
-      { x: bs * 2, z: bs * 2, h: 30, kind: 'tower', w: bs * 0.9, d: bs * 0.9 },      // sureste lejano
+      { x: bs * 2, z: bs * 2, h: 30, kind: 'tower', neon: 'STARBUCKS', neonColor: '#5aff7d', w: bs * 0.9, d: bs * 0.9 },  // sureste: Starbucks (verde) 
     ];
 
     for (const s of spots) {
@@ -116,7 +116,8 @@ export class Buildings {
 
     // letrero de neón sobre la tienda
     if (s.neon) {
-      const signTex = neonSignTex(s.neon, { color: ['#ff3b6b', '#3bd0ff', '#ffe23b', '#9b6bff'][rng.int(0, 3)], size: 256 });
+      const neonColor = s.neonColor || ['#ff3b6b', '#3bd0ff', '#ffe23b', '#9b6bff'][rng.int(0, 3)];
+      const signTex = neonSignTex(s.neon, { color: neonColor, size: 256 });
       const sign = new THREE.Mesh(
         new THREE.PlaneGeometry(w * 0.7, 3),
         new THREE.MeshBasicMaterial({ map: signTex, transparent: true })
@@ -147,6 +148,19 @@ export class Buildings {
       led2.position.z = -d / 2 - 0.1;
       led2.rotation.y = Math.PI;
       group.add(led2);
+    }
+
+    // reflejo del neón en el asfalto mojado (clon invertido + opacidad baja)
+    if (s.neon) {
+      const refTex = neonSignTex(s.neon, { color: s.neonColor || '#3bd0ff', size: 128 });
+      const ref = new THREE.Mesh(
+        new THREE.PlaneGeometry(w * 0.55, 5),
+        new THREE.MeshBasicMaterial({ map: refTex, transparent: true, opacity: 0.16, depthWrite: false })
+      );
+      ref.rotation.x = -Math.PI / 2;
+      ref.rotation.z = Math.PI;   // invertido: se "refleja" hacia el cruce
+      ref.position.set(0, 0.045, d / 2 + 6.5);
+      group.add(ref);
     }
 
     group.position.set(s.x, 0, s.z);

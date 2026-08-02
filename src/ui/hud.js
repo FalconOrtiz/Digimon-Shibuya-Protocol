@@ -29,16 +29,29 @@ export class Hud {
       <div id="crosshair"><span></span></div>
       <div id="hitmarker" class="hidden"></div>
       <div id="hud-top-left">
-        <div id="hud-trainer-name"></div>
+        <div class="profile-head">
+          <div id="profile-avatar">F</div>
+          <div class="profile-info">
+            <div id="hud-trainer-name">FalconOrtiz</div>
+            <div id="profile-level">NIVEL <span id="profile-level-num">42</span></div>
+          </div>
+        </div>
         <div id="hud-bars">
-          <div class="hud-bar-row"><span class="hud-bar-label">HP</span><div class="hud-bar"><div id="hud-hp" class="hud-bar-fill hp"></div></div></div>
-          <div class="hud-bar-row"><span class="hud-bar-label">ST</span><div class="hud-bar"><div id="hud-stamina" class="hud-bar-fill st"></div></div></div>
+          <div class="hud-bar-row"><span class="hud-bar-label">VIDA</span><div class="hud-bar"><div id="hud-hp" class="hud-bar-fill hp"></div></div><span class="hud-bar-num" id="hud-hp-num">100/100</span></div>
+          <div class="hud-bar-row"><span class="hud-bar-label">ENERGIA</span><div class="hud-bar"><div id="hud-stamina" class="hud-bar-fill st"></div></div><span class="hud-bar-num" id="hud-st-num">100/100</span></div>
         </div>
       </div>
       <div id="hud-digimon">
         <div id="hud-digimon-name"></div>
         <div class="hud-bar"><div id="hud-dhp" class="hud-bar-fill dhp"></div></div>
         <div id="hud-digimon-lv"></div>
+      </div>
+      <div id="hud-inventory">
+        <div class="inv-head">
+          <span>INVENTARIO</span>
+          <button id="inv-close" title="Cerrar (I)">✕</button>
+        </div>
+        <div id="inv-grid"></div>
       </div>
       <div id="hud-interact" class="hidden">[E] Interactuar</div>
       <div id="battle-ui" class="hidden">
@@ -56,13 +69,17 @@ export class Hud {
     this.rootEl.appendChild(el);
 
     this.hpEl = el.querySelector('#hud-hp');
+    this.hpNumEl = el.querySelector('#hud-hp-num');
     this.stEl = el.querySelector('#hud-stamina');
+    this.stNumEl = el.querySelector('#hud-st-num');
     this.dhpEl = el.querySelector('#hud-dhp');
     this.dNameEl = el.querySelector('#hud-digimon-name');
     this.dLvEl = el.querySelector('#hud-digimon-lv');
     this.hitmarkerEl = el.querySelector('#hitmarker');
     this.msgEl = el.querySelector('#hud-message');
     this.interactEl = el.querySelector('#hud-interact');
+    this.invEl = el.querySelector('#hud-inventory');
+    this.invGridEl = el.querySelector('#inv-grid');
     this.battleEl = el.querySelector('#battle-ui');
     this.enemyInfoEl = el.querySelector('#battle-enemy-info');
     this.actionsEl = el.querySelector('#battle-actions');
@@ -73,19 +90,57 @@ export class Hud {
     this.qteRingEl = el.querySelector('#qte-ring');
     this.logEl = el.querySelector('#battle-log');
 
+    // perfil del trainer
+    const trainer = this.ctx.get('trainer');
+    if (trainer) {
+      el.querySelector('#hud-trainer-name').textContent = trainer.name;
+      el.querySelector('#profile-level-num').textContent = trainer.level;
+      el.querySelector('#profile-avatar').textContent = trainer.name.charAt(0).toUpperCase();
+    }
+
+    // inventario: grid 6 slots
+    this._renderInventory();
+
+    // cerrar inventario
+    el.querySelector('#inv-close').addEventListener('click', () => {
+      this.invEl.classList.add('hidden');
+    });
+
     this._qteAnimId = null;
     this._qteStart = 0;
     this._qteDuration = 1;
     this._qteType = 'crit';
   }
 
+  _renderInventory() {
+    // 6 slots: gadgets/pociones/armas (estilo del prompt)
+    const items = [
+      { icon: '💊', name: 'Poción', cls: 'potion' },
+      { icon: '🥚', name: 'Digihuevo', cls: 'egg' },
+      { icon: '⚡', name: 'Chip', cls: 'chip' },
+      { icon: '🍞', name: 'DigiPan', cls: 'pan' },
+      { icon: '🎯', name: 'Tracker', cls: 'tracker' },
+      { icon: '📡', name: 'Digivice+', cls: 'plus' }
+    ];
+    this.invGridEl.innerHTML = '';
+    for (const it of items) {
+      const slot = document.createElement('div');
+      slot.className = 'inv-slot ' + it.cls;
+      slot.innerHTML = `<span class="inv-icon">${it.icon}</span><span class="inv-name">${it.name}</span>`;
+      slot.title = it.name;
+      this.invGridEl.appendChild(slot);
+    }
+  }
+
   _wire() {
     const ev = this.events;
     ev.on('player:health', (p) => {
       this.hpEl.style.width = `${(p.current / p.max) * 100}%`;
+      if (this.hpNumEl) this.hpNumEl.textContent = `${Math.round(p.current)}/${p.max}`;
     });
     ev.on('player:stamina', (p) => {
       this.stEl.style.width = `${(p.current / p.max) * 100}%`;
+      if (this.stNumEl) this.stNumEl.textContent = `${Math.round(p.current)}/${p.max}`;
     });
     ev.on('digimon:damage', (p) => this._updateDhp());
     ev.on('digimon:heal', (p) => this._updateDhp());
@@ -270,6 +325,14 @@ export class Hud {
     // crosshair visible solo en exploración
     const c = document.getElementById('crosshair');
     c.style.opacity = this.mode === 'battle' ? '0' : '1';
+
+    // tecla I alterna inventario (solo en exploración)
+    if (this.mode !== 'battle') {
+      const input = this.ctx.input;
+      if (input.tapRaw('KeyI')) {
+        this.invEl.classList.toggle('hidden');
+      }
+    }
   }
 
   resize() {}
