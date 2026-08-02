@@ -10,8 +10,8 @@
 // la batalla emite eventos para que el HUD y la presentación se actualicen.
 
 import { QteSystem, qteCritResult } from './qte.js';
-import { damageForMove, getMove } from '../digimon/moves.js';
-import { getSpecies, EXTRA_MOVES } from '../digimon/registry.js';
+import { damageForMove, getMove } from '../core/digimon-moves.js';
+import { getSpecies, EXTRA_MOVES } from '../core/digimon-data.js';
 
 const PHASE = {
   INTRO: 'intro',

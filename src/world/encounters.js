@@ -3,10 +3,6 @@
 // También gestiona el rival (trainer) que aparece cerca del cruce.
 
 import * as THREE from 'three';
-import { buildDigimon } from '../digimon/models.js';
-import { DigimonAnimator } from '../digimon/anim.js';
-import { getSpecies } from '../digimon/registry.js';
-import { createDigimonSprite, disposeSprite, hasDigimonSprite } from '../digimon/sprites.js';
 
 const WILD_POOL = ['koromon', 'nyaromon', 'bukamon'];
 
@@ -36,9 +32,12 @@ export class Encounters {
 
   _spawnWild() {
     const species = this.rng.pick(WILD_POOL);
-    const spec = getSpecies(species);
-    const model = buildDigimon(species);
-    const anim = new DigimonAnimator(model);
+    // fábrica vía ctx (contrato: sin imports cruzados entre subsistemas)
+    const digimonSys = this.ctx.get('digimon');
+    const member = digimonSys.createWildMember(species, this.rng.int(3, 6));
+    if (!member) return null;
+    const { species: spec, model, anim } = member;
+    const sprite = member.sprite;
 
     // posición aleatoria en el cruce o calles
     const a = this.rng.float() * Math.PI * 2;
@@ -46,13 +45,19 @@ export class Encounters {
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     model.position.set(x, 0, z);
     this.root.add(model);
+    if (sprite) {
+      sprite.position.set(x, 0, z);
+      this.root.add(sprite);
+      model.visible = false;   // en exploración se ve el sprite
+    }
 
     const wanderDir = new THREE.Vector3(Math.cos(a + Math.PI / 2), 0, Math.sin(a + Math.PI / 2));
     const wild = {
       species: spec,
       model,
       anim,
-      level: this.rng.int(3, 6),
+      sprite,
+      level: member.level,
       wanderDir,
       phase: this.rng.float() * Math.PI * 2,
       active: true
@@ -65,14 +70,12 @@ export class Encounters {
     const digimonSys = this.ctx.get('digimon');
     const playerSpecies = digimonSys.party[0]?.species.id || 'agumon';
     const species = playerSpecies === 'agumon' ? 'patamon' : 'agumon';
-    const spec = getSpecies(species);
-    const model = buildDigimon(species);
-    const anim = new DigimonAnimator(model);
+    const member = digimonSys.createWildMember(species, 6);
+    if (!member) return;
+    const { species: spec, model, anim } = member;
+    const sprite = member.sprite;
     model.position.set(22, 0, -22);
     this.root.add(model);
-
-    // sprite billboard del rival (tiene referencia de imagen)
-    const sprite = createDigimonSprite(species);
     if (sprite) {
       sprite.position.set(22, 0, -22);
       this.root.add(sprite);
@@ -106,6 +109,13 @@ export class Encounters {
       w.model.rotation.y = Math.atan2(w.wanderDir.x, w.wanderDir.z);
       w.anim.update(dt);
       if (w.anim.state === 'idle') w.anim.play('walk', 1.0);
+
+      // sprite sigue al modelo
+      if (w.sprite) {
+        w.sprite.position.x = w.model.position.x;
+        w.sprite.position.z = w.model.position.z;
+        w.sprite.position.y = w.model.position.y + 0.02;
+      }
 
       // encounter radius
       if (w.active && d < 34 && Math.hypot(ppos.x - w.model.position.x, ppos.z - w.model.position.z) < 1.6) {
@@ -163,10 +173,10 @@ export class Encounters {
   resize() {}
   dispose() {
     this.world.root.remove(this.root);
-    this.root.traverse(o => {
-      if (o.geometry) o.geometry.dispose();
-      if (o.material) o.material.dispose();
-    });
-    if (this.rival && this.rival.sprite) disposeSprite(this.rival.sprite);
+    const digimonSys = this.ctx.get('digimon');
+    for (const w of this.wilds) digimonSys.disposeWildMember(w);
+    if (this.rival) digimonSys.disposeWildMember(this.rival);
+    this.wilds = [];
+    this.rival = null;
   }
 }

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { buildDigimon } from './models.js';
 import { DigimonAnimator } from './anim.js';
-import { getSpecies } from './registry.js';
+import { getSpecies } from '../core/digimon-data.js';
 import { MOVES } from '../core/config.js';
 import { createDigimonSprite, disposeSprite } from './sprites.js';
 
@@ -66,6 +66,34 @@ export class DigimonSystem {
     };
     this.party.push(member);
     return member;
+  }
+
+  // fábrica pública para otros subsistemas (contrato: NUNCA importar digimon/models
+  // desde fuera — esto se obtiene vía ctx.get('digimon').createWildMember())
+  // Devuelve { species, model, anim, sprite } ya montado en la escena del llamador.
+  createWildMember(speciesId, level = 4) {
+    const spec = getSpecies(speciesId);
+    if (!spec) return null;
+    const model = buildDigimon(speciesId);
+    const anim = new DigimonAnimator(model);
+    const sprite = createDigimonSprite(speciesId);
+    return { species: spec, model, anim, sprite, level };
+  }
+
+  // libera un miembro creado con createWildMember
+  disposeWildMember(member) {
+    if (!member) return;
+    if (member.sprite) {
+      if (member.sprite.parent) member.sprite.parent.remove(member.sprite);
+      disposeSprite(member.sprite);
+    }
+    if (member.model) {
+      if (member.model.parent) member.model.parent.remove(member.model);
+      member.model.traverse(o => {
+        if (o.geometry) o.geometry.dispose();
+        if (o.material) o.material.dispose();
+      });
+    }
   }
 
   // digimon activo para batalla (el primero con hp > 0)

@@ -1,8 +1,8 @@
 // src/digimon/moves.js — definición de movimientos y cálculo de daño.
 // Cada move tiene ventana de QTE (fracción de la barra donde es crit).
 
-import { MOVES } from '../core/config.js';
-import { EXTRA_MOVES, speciesMoveNames } from './registry.js';
+import { MOVES } from './config.js';
+import { EXTRA_MOVES, speciesMoveNames } from './digimon-data.js';
 
 const ALL_MOVES = { ...MOVES, ...EXTRA_MOVES };
 

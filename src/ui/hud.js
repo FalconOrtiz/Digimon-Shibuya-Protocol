@@ -345,7 +345,7 @@ export class Hud {
 }
 
 // nombre de move desde el registro
-import { getMove } from '../digimon/moves.js';
+import { getMove } from '../core/digimon-moves.js';
 function moveName(id) {
   const m = getMove(id);
   return m ? m.name : id;
