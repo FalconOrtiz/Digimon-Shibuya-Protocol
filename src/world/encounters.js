@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { buildDigimon } from '../digimon/models.js';
 import { DigimonAnimator } from '../digimon/anim.js';
 import { getSpecies } from '../digimon/registry.js';
+import { createDigimonSprite, disposeSprite, hasDigimonSprite } from '../digimon/sprites.js';
 
 const WILD_POOL = ['koromon', 'nyaromon', 'bukamon'];
 
@@ -70,10 +71,19 @@ export class Encounters {
     model.position.set(22, 0, -22);
     this.root.add(model);
 
+    // sprite billboard del rival (tiene referencia de imagen)
+    const sprite = createDigimonSprite(species);
+    if (sprite) {
+      sprite.position.set(22, 0, -22);
+      this.root.add(sprite);
+      model.visible = false;   // en exploración se ve el sprite
+    }
+
     this.rival = {
       species: spec,
       model,
       anim,
+      sprite,
       level: 6,
       name: 'Ren',
       active: true
@@ -107,6 +117,11 @@ export class Encounters {
     // rival: se queda en su sitio, animación idle
     if (this.rival && this.rival.active) {
       this.rival.anim.update(dt);
+      if (this.rival.sprite) {
+        this.rival.sprite.position.x = this.rival.model.position.x;
+        this.rival.sprite.position.z = this.rival.model.position.z;
+        this.rival.sprite.position.y = this.rival.model.position.y + 0.02;
+      }
       const d = Math.hypot(ppos.x - this.rival.model.position.x, ppos.z - this.rival.model.position.z);
       if (d < 2.2) {
         this.rival.active = false;
@@ -152,5 +167,6 @@ export class Encounters {
       if (o.geometry) o.geometry.dispose();
       if (o.material) o.material.dispose();
     });
+    if (this.rival && this.rival.sprite) disposeSprite(this.rival.sprite);
   }
 }

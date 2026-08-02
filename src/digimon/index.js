@@ -7,6 +7,7 @@ import { buildDigimon } from './models.js';
 import { DigimonAnimator } from './anim.js';
 import { getSpecies } from './registry.js';
 import { MOVES } from '../core/config.js';
+import { createDigimonSprite, disposeSprite } from './sprites.js';
 
 export class DigimonSystem {
   static id = 'digimon';
@@ -30,6 +31,9 @@ export class DigimonSystem {
     this.active = this.party[0];
     this.followPos = new THREE.Vector3(2.5, 0, 2.5);
 
+    // modo: sprite en exploración, modelo 3D en batalla
+    this.events.on('mode', (p) => this.setMode(p.mode));
+
     return this;
   }
 
@@ -41,10 +45,19 @@ export class DigimonSystem {
     model.position.set(3, 0, 3);
     this.scene.add(model);
 
+    // sprite billboard (referencias) — visible en exploración, oculto en batalla
+    const sprite = createDigimonSprite(speciesId);
+    if (sprite) {
+      sprite.position.set(3, 0, 3);
+      this.scene.add(sprite);
+      model.visible = false;   // en exploración se ve el sprite
+    }
+
     const member = {
       species: spec,
       model,
       anim,
+      sprite,
       level,
       hp: spec.hp,
       maxHp: spec.hp,
@@ -75,9 +88,15 @@ export class DigimonSystem {
     const tz = p.z + cos * 2.2;
 
     const m = this.active.model;
+    const sp = this.active.sprite;
     const speed = 4;
     m.position.x += (tx - m.position.x) * Math.min(1, speed * dt);
     m.position.z += (tz - m.position.z) * Math.min(1, speed * dt);
+    if (sp) {
+      sp.position.x = m.position.x;
+      sp.position.z = m.position.z;
+      sp.position.y = m.position.y + 0.02;
+    }
 
     // mirar hacia la dirección del jugador
     const targetYaw = this.player.yaw + Math.PI; // mirando en la misma dirección que el jugador
@@ -93,10 +112,25 @@ export class DigimonSystem {
     this.active.anim.update(dt);
   }
 
+  // alterna entre sprite (exploración) y modelo 3D (batalla)
+  setMode(mode) {
+    const showSprite = mode !== 'battle';
+    for (const member of this.party) {
+      if (member.sprite) {
+        member.sprite.visible = showSprite;
+        member.model.visible = !showSprite;
+      }
+    }
+  }
+
   resize() {}
   dispose() {
     for (const m of this.party) {
       this.scene.remove(m.model);
+      if (m.sprite) {
+        this.scene.remove(m.sprite);
+        disposeSprite(m.sprite);
+      }
       m.model.traverse(o => {
         if (o.geometry) o.geometry.dispose();
         if (o.material) o.material.dispose();

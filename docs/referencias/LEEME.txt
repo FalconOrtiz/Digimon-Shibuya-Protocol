@@ -35,3 +35,10 @@ ACTUALIZACION 4 (assets de personajes desde Desktop/DIGIMON):
   OJOS AZULES #3a7ad8, manos/pies NEGROS #20242c, cola corta
 - Digivice referencia: azul #205090 (CSS ya usa #3bd0ff)
 - Paleta Shibuya de las referencias: tonos atardecer azul-violeta
+
+ACTUALIZACION 5 (sprites de digimons en el mundo):
+- public/assets/agumon-sprite.png + patamon-sprite.png (vista frontal recortada + chroma key)
+- src/digimon/sprites.js: billboards con las imagenes de referencia
+- Exploracion = sprite fiel a la referencia; Batalla = modelo 3D animado (alternancia por evento mode)
+- El rival (Ren) tambien usa sprite
+- Los salvajes (koromon/nyaromon/bukamon) siguen con modelos 3D (sin referencia de imagen)
