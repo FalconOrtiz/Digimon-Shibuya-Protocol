@@ -95,7 +95,7 @@ export function defaultConfig() {
       arenaRadius: 18
     },
     world: {
-      startHour: 17.0,      // golden hour cálido (estilo cartoon)
+      startHour: 18.5,      // atardecer dorado→violeta (ref FPS: cielo #f0d8a8 en horizonte)
       daySpeed: 0.02,       // horas por segundo real
       spawnRadius: 60
     },

@@ -9,7 +9,7 @@ export class Player {
   static deps = ['world', 'buildings'];
 
   constructor() {
-    this.pos = new THREE.Vector3(0, 1.7, 14);
+    this.pos = new THREE.Vector3(0, 1.7, 0);   // en el CENTRO del cruce (ref: "standing in the middle")
     this.vel = new THREE.Vector3();
     this.yaw = 0;
     this.pitch = 0;

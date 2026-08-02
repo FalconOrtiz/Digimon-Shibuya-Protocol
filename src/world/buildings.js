@@ -61,20 +61,26 @@ export class Buildings {
     const rng = this.rng.fork();
     const seed = rng.int(1, 999);
 
-    // base de la torre — paleta vibrante cartoon (estilo Pokémon/AC)
+    // base de la torre — paleta desaturada violeta/marrón (Art Bible, ref #604848/#786060)
     const palette = [
-      '#e8cfa8', '#f0b8c8', '#b8d8f0', '#c8e8b8', '#f0d8a0', '#d8c8f0', '#b8e8e0', '#f0c8a8'
+      '#786878', '#8a7878', '#786068', '#887870', '#706878', '#8a8080', '#786880', '#988078'
     ];
     const facade = facadeTex({
       base: palette[rng.int(0, palette.length - 1)],
-      frame: '#c9a878',
-      win: '#a8e0f8', winDark: '#6a9ab8',
+      frame: '#5a5458',
+      win: '#f0d8a8', winDark: '#6a5a58',   // ventanas cálidas doradas (ref #f0d8a8)
       rows: Math.max(4, Math.floor(h / 5)), cols: Math.max(3, Math.floor(w / 6)),
-      litChance: 0.4, seed, size: 512
+      litChance: 0.55, seed, size: 512      // más ventanas encendidas (ciudad viva de noche)
     });
     const box = new THREE.Mesh(
       new THREE.BoxGeometry(w, h, d),
-      new THREE.MeshStandardMaterial({ map: facade, roughness: 0.75, metalness: 0.05 })
+      new THREE.MeshStandardMaterial({
+        map: facade,
+        roughness: 0.75,
+        metalness: 0.05,
+        emissive: 0x2a2028,          // la ciudad emite luz propia en hora azul
+        emissiveIntensity: 0.55
+      })
     );
     box.position.y = h / 2;
     box.castShadow = true;

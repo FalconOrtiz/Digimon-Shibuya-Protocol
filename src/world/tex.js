@@ -27,19 +27,19 @@ function hash2(x, y, seed = 0) {
   return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
 }
 
-// ---- asfalto: gris azulado suave con speckle (estilo cartoon) ----
+// ---- asfalto: violeta-gris claro (Art Bible: #604860/#484848, legible de noche) ----
 export function asphaltTex(size = 256, seed = 7) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#3d4450';   // asfalto cartoon: azulado suave, no negro
+    g.fillStyle = '#6a6480';   // violeta-gris claro (no oscuro: el tonemapping lo aplasta)
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < s * s * 0.5; i++) {
       const x = hash2(i, 1, seed) * s, y = hash2(i, 2, seed) * s;
-      const v = 52 + hash2(i, 3, seed) * 26;
-      g.fillStyle = `rgba(${v},${v + 4},${v + 10},0.5)`;
+      const v = 88 + hash2(i, 3, seed) * 22;
+      g.fillStyle = `rgba(${v},${v - 4},${v + 10},0.5)`;
       g.fillRect(x, y, 1.8, 1.8);
     }
-    // juntas y grietas suaves
-    g.strokeStyle = 'rgba(30,34,42,0.4)';
+    // juntas suaves
+    g.strokeStyle = 'rgba(50,48,64,0.4)';
     g.lineWidth = 1.5;
     for (let x = 0; x < s; x += 64) {
       g.beginPath(); g.moveTo(x + hash2(x, 0, seed) * 4, 0); g.lineTo(x + hash2(x, 1, seed) * 4, s); g.stroke();
@@ -47,18 +47,18 @@ export function asphaltTex(size = 256, seed = 7) {
   });
 }
 
-// ---- acera: crema cálida (estilo painted) ----
+// ---- acera: gris piedra cálido ----
 export function sidewalkTex(size = 256, seed = 3) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#c9c2b0';   // crema cálida cartoon
+    g.fillStyle = '#9a9088';   // piedra desaturada
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < s * s * 0.35; i++) {
       const x = hash2(i, 4, seed) * s, y = hash2(i, 5, seed) * s;
-      const v = 185 + hash2(i, 6, seed) * 28;
-      g.fillStyle = `rgba(${v},${v - 4},${v - 16},0.4)`;
+      const v = 138 + hash2(i, 6, seed) * 24;
+      g.fillStyle = `rgba(${v},${v - 6},${v - 12},0.4)`;
       g.fillRect(x, y, 2.2, 2.2);
     }
-    g.strokeStyle = 'rgba(160,152,132,0.7)';
+    g.strokeStyle = 'rgba(120,112,104,0.6)';
     g.lineWidth = 2;
     const step = s / 4;
     for (let i = 0; i <= 4; i++) {
@@ -68,21 +68,20 @@ export function sidewalkTex(size = 256, seed = 3) {
   });
 }
 
-// ---- paso de cebra (crosswalk) cartoon ----
+// ---- paso de cebra: blanco limpio sobre violeta-gris ----
 export function crosswalkTex(size = 256, seed = 11) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#3d4450';
+    g.fillStyle = '#5a5468';
     g.fillRect(0, 0, s, s);
-    // franjas blancas limpias y vibrantes
     const stripeW = s / 8;
     for (let i = 0; i < 8; i++) {
-      g.fillStyle = i % 2 === 0 ? '#f5f5f0' : '#3d4450';
+      g.fillStyle = i % 2 === 0 ? '#e8e8e8' : '#5a5468';
       g.fillRect(i * stripeW, 0, stripeW, s);
     }
     // desgaste sutil
-    for (let i = 0; i < s * s * 0.08; i++) {
+    for (let i = 0; i < s * s * 0.06; i++) {
       const x = hash2(i, 7, seed) * s, y = hash2(i, 8, seed) * s;
-      g.fillStyle = `rgba(90,95,105,${0.1 + hash2(i, 9, seed) * 0.2})`;
+      g.fillStyle = `rgba(90,88,104,${0.1 + hash2(i, 9, seed) * 0.18})`;
       g.fillRect(x, y, 3 + hash2(i, 10, seed) * 5, 2);
     }
   });

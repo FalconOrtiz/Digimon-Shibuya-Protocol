@@ -44,7 +44,7 @@ export class Shibuya {
       new THREE.PlaneGeometry(WORLD.size, WORLD.size, 1, 1),
       new THREE.MeshStandardMaterial({
         map: asphaltTex(512, 7),
-        roughness: 0.42, metalness: 0.12   // asfalto mojado: brillo húmedo
+        roughness: 0.45, metalness: 0.0   // asfalto mojado: brillo vía roughness baja (sin metalness → no oscurece)
       })
     );
     ground.rotation.x = -Math.PI / 2;
@@ -60,7 +60,7 @@ export class Shibuya {
     const make = (angle) => {
       const m = new THREE.Mesh(
         new THREE.PlaneGeometry(WORLD.crosswalkLen, 9, 1, 1),
-        new THREE.MeshStandardMaterial({ map: cw, roughness: 0.35, metalness: 0.1 })  // mojado
+        new THREE.MeshStandardMaterial({ map: cw, roughness: 0.4, metalness: 0.0 })  // mojado sin metalness
       );
       m.rotation.x = -Math.PI / 2;
       m.rotation.z = angle;
@@ -78,7 +78,7 @@ export class Shibuya {
     const mk = (w, h, x, z, ry = 0) => {
       const m = new THREE.Mesh(
         new THREE.PlaneGeometry(w, h, 1, 1),
-        new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.42, metalness: 0.12 })  // mojado
+        new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.45, metalness: 0.0 })  // mojado sin metalness
       );
       m.rotation.x = -Math.PI / 2;
       m.rotation.y = ry;

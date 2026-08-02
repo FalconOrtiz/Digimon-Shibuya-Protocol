@@ -28,7 +28,7 @@ export class Engine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.45;
+    this.renderer.toneMappingExposure = 2.5;   // Art Bible: brillo medio objetivo ~120
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0x0a0e1a, 40, this.q.far);

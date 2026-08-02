@@ -26,11 +26,11 @@ export class Npcs {
     c.width = 64; c.height = 96;
     const g = c.getContext('2d');
 
-    // paleta de ropa urbana vibrante (estilo cartoon Pokémon/AC)
-    const shirts = ['#ff6b8a', '#4ac0ff', '#5aff8a', '#ffb84a', '#c86bff', '#ff8a5a', '#4ae8d8', '#7a9aff', '#ff5a5a', '#8aff6b'];
-    const pants = ['#4a5a7a', '#6a5a8a', '#5a7a6a', '#8a7a5a', '#4a6a8a', '#7a5a6a'];
-    const skin = ['#ffd9b0', '#f0b888', '#d89860', '#ffe8c8'];
-    const hair = ['#3a2a1a', '#2a2a3a', '#6a4a2a', '#8a6a3a', '#c84a4a', '#3a3a4a'];
+    // paleta de ropa moderada (Art Bible: saturación 0.28, nada que grite)
+    const shirts = ['#786878', '#8a6a6a', '#6a7888', '#887860', '#6a6a8a', '#8a7078', '#78887a', '#6a6a78', '#8a6868', '#707878'];
+    const pants = ['#484858', '#585068', '#505860', '#685858', '#4a4a5a', '#605068'];
+    const skin = ['#d8b898', '#c8a078', '#b08860', '#e0c0a0'];
+    const hair = ['#3a3038', '#484048', '#5a4840', '#6a5a48', '#6a4040', '#504850'];
 
     const shirt = rng.pick(shirts), pant = rng.pick(pants), sk = rng.pick(skin), hr = rng.pick(hair);
     const isFemale = rng.chance(0.5);
