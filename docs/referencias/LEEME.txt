@@ -1,0 +1,13 @@
+Carpeta de referencias de Shibuya para el mapa.
+Coloca aquí imágenes de referencia (fotos del cruce, mapas, fachadas de edificios).
+Con un modelo con visión (o manualmente) se usarán para afinar el mapa.
+
+Referencia base ya aplicada en codigo (disposicion real):
+- NO: Scramble Square (torre 52m, la mas alta)
+- NE: QFRONT (pantalla LED gigante 38% de la fachada)
+- SO: Shibuya 109 (retail)
+- SE: Hikarie
+- Oeste (salida): Hachiko (-24.5, -8.5)
+- Calles: Koen-dori (N), Miyamasuzaka (E), Dogenzaka (W), Center-gai (S), Love Hotel Hill (SW)
+- Cruce: lat 35.6595, lon 139.7005
+
