@@ -10,13 +10,18 @@ import * as THREE from 'three';
 
 const SKIN = {
   agumon: {
-    body: 0xff8c2a, belly: 0xffd9a0, dark: 0xc96a1a,
-    eyes: 0x20242c, eyeHighlight: 0xffffff,
+    // Prompt: naranja brillante, OJOS VERDES grandes, hocico corto con dientes blancos,
+    // garras blancas afiladas, cola corta y rechoncha
+    body: 0xe08030, belly: 0xffe0b0, dark: 0xb06020,
+    eyes: 0x2ec44a, eyeHighlight: 0xffffff,
     scale: 1.0, yOff: 0.55
   },
   patamon: {
-    body: 0xffe066, belly: 0xfff6d8, dark: 0xd9b23b,
-    eyes: 0x20242c, eyeHighlight: 0xffffff,
+    // Prompt: CREMA y naranja, OJOS AZULES grandes, orejas naranja tipo ala de
+    // murciélago, manos y pies NEGROS pequeños, cola corta, flotando
+    body: 0xf0e0c8, belly: 0xfff6e0, dark: 0xd07030,
+    ears: 0xe08030, eyes: 0x3a7ad8, eyeHighlight: 0xffffff,
+    limbs: 0x20242c,   // manos y pies negros
     scale: 0.95, yOff: 0.5
   }
 };
@@ -77,7 +82,7 @@ function buildAgumon(s = SKIN.agumon) {
   teeth.position.set(0, 0.58, 0.52);
   g.add(teeth);
 
-  // ojos grandes
+  // ojos grandes (VERDES para Agumon, según prompt)
   const eyeGeo = new THREE.SphereGeometry(0.085, 10, 8);
   const eyeL = mesh(eyeGeo, eyeM); eyeL.position.set(-0.17, 0.82, 0.38); g.add(eyeL);
   const eyeR = mesh(eyeGeo.clone(), eyeM); eyeR.position.set(0.17, 0.82, 0.38); g.add(eyeR);
@@ -93,11 +98,11 @@ function buildAgumon(s = SKIN.agumon) {
   armL.position.set(-0.55, 0.25, 0.1); g.add(armL);
   const armR = mesh(new THREE.SphereGeometry(0.16, 10, 8), body);
   armR.position.set(0.55, 0.25, 0.1); g.add(armR);
-  // garras
-  const clawL = mesh(new THREE.BoxGeometry(0.07, 0.12, 0.07), std(0xf0f0ea));
-  clawL.position.set(-0.55, 0.12, 0.14); g.add(clawL);
-  const clawR = mesh(new THREE.BoxGeometry(0.07, 0.12, 0.07), std(0xf0f0ea));
-  clawR.position.set(0.55, 0.12, 0.14); g.add(clawR);
+  // garras blancas afiladas (prompt)
+  const clawL = mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), std(0xf8f8f2));
+  clawL.position.set(-0.55, 0.11, 0.15); g.add(clawL);
+  const clawR = mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), std(0xf8f8f2));
+  clawR.position.set(0.55, 0.11, 0.15); g.add(clawR);
   parts.armL = armL; parts.armR = armR; parts.clawL = clawL; parts.clawR = clawR;
 
   // piernas
@@ -143,22 +148,22 @@ function buildPatamon(s = SKIN.patamon) {
   g.add(head);
   parts.head = head;
 
-  // orejas grandes de murciélago (patamon)
-  const earGeo = new THREE.ConeGeometry(0.13, 0.42, 8);
-  const earL = mesh(earGeo, body);
-  earL.position.set(-0.24, 1.0, -0.02);
+  // orejas grandes naranja tipo ala de murciélago (prompt: Wing-Ear Mammal)
+  const earGeo = new THREE.ConeGeometry(0.15, 0.48, 8);
+  const earL = mesh(earGeo, std(s.ears));
+  earL.position.set(-0.26, 1.02, -0.02);
   earL.rotation.z = 0.35;
   g.add(earL);
-  const earR = mesh(earGeo.clone(), body);
-  earR.position.set(0.24, 1.0, -0.02);
+  const earR = mesh(earGeo.clone(), std(s.ears));
+  earR.position.set(0.26, 1.02, -0.02);
   earR.rotation.z = -0.35;
   g.add(earR);
   parts.earL = earL; parts.earR = earR;
 
-  // cara: ojos gigantes
+  // cara: ojos gigantes AZULES (prompt)
   const eyeGeo = new THREE.SphereGeometry(0.1, 10, 8);
-  const eyeL = mesh(eyeGeo, eyeM); eyeL.position.set(-0.16, 0.68, 0.36); g.add(eyeL);
-  const eyeR = mesh(eyeGeo.clone(), eyeM); eyeR.position.set(0.16, 0.68, 0.36); g.add(eyeR);
+  const eyeL = mesh(eyeGeo, std(s.eyes, 0.2)); eyeL.position.set(-0.16, 0.68, 0.36); g.add(eyeL);
+  const eyeR = mesh(eyeGeo.clone(), std(s.eyes, 0.2)); eyeR.position.set(0.16, 0.68, 0.36); g.add(eyeR);
   const glint = std(s.eyeHighlight, 0.2);
   const gl = mesh(new THREE.SphereGeometry(0.032, 6, 6), glint);
   gl.position.set(-0.12, 0.71, 0.44); g.add(gl);
@@ -170,21 +175,22 @@ function buildPatamon(s = SKIN.patamon) {
   mouth.position.set(0, 0.56, 0.42);
   g.add(mouth);
 
-  // brazos cortitos
-  const armL = mesh(new THREE.SphereGeometry(0.13, 10, 8), body);
+  // brazos cortitos NEGROS (prompt: tiny black hands)
+  const limbMat = std(s.limbs);
+  const armL = mesh(new THREE.SphereGeometry(0.13, 10, 8), limbMat);
   armL.position.set(-0.48, 0.18, 0.12); g.add(armL);
-  const armR = mesh(new THREE.SphereGeometry(0.13, 10, 8), body);
+  const armR = mesh(new THREE.SphereGeometry(0.13, 10, 8), limbMat);
   armR.position.set(0.48, 0.18, 0.12); g.add(armR);
   parts.armL = armL; parts.armR = armR;
 
-  // piernas
+  // piernas NEGRAS pequeñas (prompt)
   const legGeo = new THREE.SphereGeometry(0.15, 10, 8);
-  const legL = mesh(legGeo, body); legL.scale.set(1, 0.7, 1); legL.position.set(-0.2, -0.4, 0.1); g.add(legL);
-  const legR = mesh(legGeo.clone(), body); legR.scale.set(1, 0.7, 1); legR.position.set(0.2, -0.4, 0.1); g.add(legR);
+  const legL = mesh(legGeo, limbMat); legL.scale.set(1, 0.7, 1); legL.position.set(-0.2, -0.4, 0.1); g.add(legL);
+  const legR = mesh(legGeo.clone(), limbMat); legR.scale.set(1, 0.7, 1); legR.position.set(0.2, -0.4, 0.1); g.add(legR);
   parts.legL = legL; parts.legR = legR;
 
-  // cola corta
-  const tail = mesh(new THREE.SphereGeometry(0.09, 8, 6), dark);
+  // cola corta (prompt)
+  const tail = mesh(new THREE.SphereGeometry(0.09, 8, 6), std(s.dark));
   tail.scale.set(1.3, 1, 1);
   tail.position.set(0, 0.05, -0.55);
   g.add(tail);

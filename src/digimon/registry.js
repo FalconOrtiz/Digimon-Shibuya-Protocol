@@ -9,7 +9,7 @@ export const DIGIMON_SPECIES = {
     name: 'Agumon',
     element: 'fire',
     hp: 90, atk: 12, def: 8, sp: 10,
-    color: 0xff8c2a,
+    color: 0xe08030,      // naranja brillante (referencia Orange Dino Partner)
     moves: ['babyFlame', 'peppersBreath'],
     description: 'Un digimon reptil que sueña con ser fuerte. Su Peppers Breath quema todo.',
     digivolvesTo: 'greymon'
@@ -19,7 +19,7 @@ export const DIGIMON_SPECIES = {
     name: 'Patamon',
     element: 'air',
     hp: 75, atk: 9, def: 7, sp: 14,
-    color: 0xffe066,
+    color: 0xf0e0c8,      // crema (referencia Wing-Ear Mammal Partner)
     moves: ['boomBubble', 'airShot'],
     description: 'Una cría alada alegre. Sus Boom Bubbles explotan con sorpresa.',
     digivolvesTo: 'angemon'

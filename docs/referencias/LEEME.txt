@@ -27,3 +27,11 @@ ACTUALIZACION 3 (estilo cartoon Pokemon/Animal Crossing):
 - Golden hour: cielo rosa-naranja, sol calido #ffb050, ambient suave (sin sombras negras duras)
 - Ropa NPCs: 10 colores vibrantes (rosa, azul, verde, naranja, lila, turquesa...)
 - Hora inicio: 17:00 (atardecer calido)
+
+ACTUALIZACION 4 (assets de personajes desde Desktop/DIGIMON):
+- Assets copiados a docs/referencias/assets/ (agumon, patamon, digivice, digiegg, items, shibuya x2)
+- AGUMON (Orange Dino Partner): cuerpo naranja #e08030, OJOS VERDES #2ec44a, garras blancas #f8f8f2
+- PATAMON (Wing-Ear Mammal Partner): cuerpo CREMA #f0e0c8, orejas naranja #e08030,
+  OJOS AZULES #3a7ad8, manos/pies NEGROS #20242c, cola corta
+- Digivice referencia: azul #205090 (CSS ya usa #3bd0ff)
+- Paleta Shibuya de las referencias: tonos atardecer azul-violeta
