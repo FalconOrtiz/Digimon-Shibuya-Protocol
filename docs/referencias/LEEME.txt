@@ -42,3 +42,13 @@ ACTUALIZACION 5 (sprites de digimons en el mundo):
 - Exploracion = sprite fiel a la referencia; Batalla = modelo 3D animado (alternancia por evento mode)
 - El rival (Ren) tambien usa sprite
 - Los salvajes (koromon/nyaromon/bukamon) siguen con modelos 3D (sin referencia de imagen)
+
+ACTUALIZACION 6 (assets de alta calidad + reubicacion):
+- MAESTRO DE ASSETS: D:\DIGIMON-ASSETS (7 archivos, md5 verificado)
+- BACKUP PROYECTO: D:\DIGIMON-BACKUP (111MB con node_modules)
+- Desktop/DIGIMON (C:) ELIMINADO -> papelera (todo verificado en D antes)
+- Assets nuevos: agumon01.png / patamon01.png (RGBA con transparencia nativa,
+  sin chroma key), digihuevo01.png, digivice01.jpg, items01.png
+- Sprites del juego regenerados desde los PNG de alta calidad (502x722, 563x586)
+- Regla: los assets viven en D:\DIGIMON-ASSETS (maestro) + docs/referencias/assets
+  (en repo). C: NO debe contener duplicados.
