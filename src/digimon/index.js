@@ -7,7 +7,7 @@ import { buildDigimon } from './models.js';
 import { DigimonAnimator } from './anim.js';
 import { getSpecies } from '../core/digimon-data.js';
 import { MOVES } from '../core/config.js';
-import { createDigimonSprite, disposeSprite } from './sprites.js';
+import { disposeSprite } from './sprites.js';
 
 export class DigimonSystem {
   static id = 'digimon';
@@ -30,9 +30,12 @@ export class DigimonSystem {
     // el activo sigue al jugador
     this.active = this.party[0];
     this.followPos = new THREE.Vector3(2.5, 0, 2.5);
+    for (const m of this.party) {
+      if (m !== this.active) m.model.visible = false;
+    }
 
-    // modo: sprite en exploración, modelo 3D en batalla
-    this.events.on('mode', (p) => this.setMode(p.mode));
+    // live model is always the 3D turnaround mesh (sprites are HUD portraits only)
+    this.events.on('mode', () => {});
 
     return this;
   }
@@ -45,19 +48,11 @@ export class DigimonSystem {
     model.position.set(3, 0, 3);
     this.scene.add(model);
 
-    // sprite billboard (referencias) — visible en exploración, oculto en batalla
-    const sprite = createDigimonSprite(speciesId);
-    if (sprite) {
-      sprite.position.set(3, 0, 3);
-      this.scene.add(sprite);
-      model.visible = false;   // en exploración se ve el sprite
-    }
-
     const member = {
       species: spec,
       model,
       anim,
-      sprite,
+      sprite: null,
       level,
       hp: spec.hp,
       maxHp: spec.hp,
@@ -76,8 +71,7 @@ export class DigimonSystem {
     if (!spec) return null;
     const model = buildDigimon(speciesId);
     const anim = new DigimonAnimator(model);
-    const sprite = createDigimonSprite(speciesId);
-    return { species: spec, model, anim, sprite, level };
+    return { species: spec, model, anim, sprite: null, level };
   }
 
   // libera un miembro creado con createWildMember
@@ -103,23 +97,23 @@ export class DigimonSystem {
 
   setActive(member) {
     this.active = member;
+    for (const m of this.party) m.model.visible = m === member;
     this.events.emit('digimon:active', { species: member.species.id, name: member.species.name });
   }
 
   update(dt) {
     // follow suave del digimon activo detrás del jugador
     const p = this.player.pos;
-    // posición objetivo: detrás e izquierda del jugador
-    const sin = Math.sin(this.player.yaw + Math.PI / 2);
-    const cos = Math.cos(this.player.yaw + Math.PI / 2);
-    const tx = p.x + sin * 2.2;
-    const tz = p.z + cos * 2.2;
+    const anchor = this.player.followAnchor;
+    const tx = anchor ? anchor.x : p.x;
+    const tz = anchor ? anchor.z : p.z;
 
     const m = this.active.model;
     const sp = this.active.sprite;
     const speed = 4;
     m.position.x += (tx - m.position.x) * Math.min(1, speed * dt);
     m.position.z += (tz - m.position.z) * Math.min(1, speed * dt);
+    m.position.y = 0;
     if (sp) {
       sp.position.x = m.position.x;
       sp.position.z = m.position.z;
@@ -127,7 +121,7 @@ export class DigimonSystem {
     }
 
     // mirar hacia la dirección del jugador
-    const targetYaw = this.player.yaw + Math.PI; // mirando en la misma dirección que el jugador
+    const targetYaw = this.player.yaw + Math.PI + 1.05;
     m.rotation.y += wrapAngle(targetYaw - m.rotation.y) * Math.min(1, 6 * dt);
 
     // animación según movimiento

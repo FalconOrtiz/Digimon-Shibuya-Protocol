@@ -30,7 +30,7 @@ function hash2(x, y, seed = 0) {
 // ---- asfalto: violeta-gris claro (Art Bible: #604860/#484848, legible de noche) ----
 export function asphaltTex(size = 256, seed = 7) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#6a6480';   // violeta-gris claro (no oscuro: el tonemapping lo aplasta)
+    g.fillStyle = '#4a5260';   // asfalto cartoon azul-gris
     g.fillRect(0, 0, s, s);
     for (let i = 0; i < s * s * 0.5; i++) {
       const x = hash2(i, 1, seed) * s, y = hash2(i, 2, seed) * s;
@@ -38,32 +38,33 @@ export function asphaltTex(size = 256, seed = 7) {
       g.fillStyle = `rgba(${v},${v - 4},${v + 10},0.5)`;
       g.fillRect(x, y, 1.8, 1.8);
     }
-    // juntas suaves
-    g.strokeStyle = 'rgba(50,48,64,0.4)';
-    g.lineWidth = 1.5;
-    for (let x = 0; x < s; x += 64) {
-      g.beginPath(); g.moveTo(x + hash2(x, 0, seed) * 4, 0); g.lineTo(x + hash2(x, 1, seed) * 4, s); g.stroke();
-    }
+    // grain only — long joint strokes stretch into N–S sky streaks when UVs are 0–1
   });
 }
 
 // ---- acera: gris piedra cálido ----
 export function sidewalkTex(size = 256, seed = 3) {
   return canvasTexture(size, (g, s) => {
-    g.fillStyle = '#9a9088';   // piedra desaturada
+    g.fillStyle = '#5c5a58';
     g.fillRect(0, 0, s, s);
-    for (let i = 0; i < s * s * 0.35; i++) {
+    for (let i = 0; i < s * s * 0.4; i++) {
       const x = hash2(i, 4, seed) * s, y = hash2(i, 5, seed) * s;
-      const v = 138 + hash2(i, 6, seed) * 24;
-      g.fillStyle = `rgba(${v},${v - 6},${v - 12},0.4)`;
+      const v = 78 + hash2(i, 6, seed) * 28;
+      g.fillStyle = `rgba(${v},${v - 3},${v - 8},0.45)`;
       g.fillRect(x, y, 2.2, 2.2);
     }
-    g.strokeStyle = 'rgba(120,112,104,0.6)';
-    g.lineWidth = 2;
+    g.strokeStyle = 'rgba(32,30,28,0.55)';
+    g.lineWidth = 3;
     const step = s / 4;
     for (let i = 0; i <= 4; i++) {
       g.beginPath(); g.moveTo(i * step, 0); g.lineTo(i * step, s); g.stroke();
       g.beginPath(); g.moveTo(0, i * step); g.lineTo(s, i * step); g.stroke();
+    }
+    g.strokeStyle = 'rgba(160,156,148,0.18)';
+    g.lineWidth = 1;
+    for (let i = 0; i <= 4; i++) {
+      g.beginPath(); g.moveTo(i * step + 2, 0); g.lineTo(i * step + 2, s); g.stroke();
+      g.beginPath(); g.moveTo(0, i * step + 2); g.lineTo(s, i * step + 2); g.stroke();
     }
   });
 }
@@ -168,6 +169,27 @@ export function ledBillboardTex(text, { bg = '#000614', color = '#4dd0ff', size 
     g.textBaseline = 'middle';
     g.fillText(text, s / 2, s / 2, s * 0.92);
     g.shadowBlur = 0;
+  });
+}
+
+export function adBillboardTex({ bg = '#ff6b8a', accent = '#ffe23b', label = 'SHIBUYA', size = 256 } = {}) {
+  return canvasTexture(size, (g, s) => {
+    g.fillStyle = bg;
+    g.fillRect(0, 0, s, s);
+    g.fillStyle = accent;
+    g.fillRect(s * 0.08, s * 0.08, s * 0.84, s * 0.28);
+    g.fillStyle = '#fff';
+    g.font = `bold ${Math.floor(s * 0.12)}px Arial, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(label, s / 2, s * 0.22, s * 0.8);
+    g.fillStyle = 'rgba(255,255,255,0.35)';
+    g.beginPath();
+    g.arc(s * 0.72, s * 0.68, s * 0.18, 0, Math.PI * 2);
+    g.fill();
+    g.fillStyle = 'rgba(0,0,0,0.12)';
+    g.fillRect(s * 0.12, s * 0.48, s * 0.5, s * 0.08);
+    g.fillRect(s * 0.12, s * 0.62, s * 0.36, s * 0.06);
   });
 }
 

@@ -7,15 +7,13 @@ import { MapPanel } from './map.js';
 import { DigimonsPanel } from './digimons.js';
 import { ProfilePanel } from './profile.js';
 import { EggsPanel } from './eggs.js';
-import { StatusPanel } from './status.js';
 
 const TABS = [
   { id: 'inventory', label: 'INVENTARIO', panel: InventoryPanel },
   { id: 'map', label: 'MAPA', panel: MapPanel },
   { id: 'digimons', label: 'DIGIMONS', panel: DigimonsPanel },
   { id: 'profile', label: 'PERFIL', panel: ProfilePanel },
-  { id: 'status', label: 'SALUD/STAMINA', panel: StatusPanel },
-  { id: 'eggs', label: 'DIGIHUEVOS', panel: EggsPanel }
+  { id: 'eggs', label: 'HUEVOS', panel: EggsPanel }
 ];
 
 export class Digivice {
@@ -56,6 +54,27 @@ export class Digivice {
       if (p.mode === 'battle' && this.open) this.close();
     });
 
+    this._wasLocked = false;
+    this._ignoreUnlock = false;
+    this._onLockChange = () => {
+      const locked = document.pointerLockElement === this.ctx.canvas;
+      if (locked) {
+        this._wasLocked = true;
+        return;
+      }
+      // Browser Esc always drops lock. If we were playing, that is a Digivice open.
+      if (this._ignoreUnlock) {
+        this._ignoreUnlock = false;
+        return;
+      }
+      const battle = this.ctx.peek('battle');
+      if (this._wasLocked && !this.open && !(battle && battle.running)) {
+        this._wasLocked = false;
+        this.open2();
+      }
+    };
+    document.addEventListener('pointerlockchange', this._onLockChange);
+
     return this;
   }
 
@@ -93,7 +112,7 @@ export class Digivice {
     // footer
     const footer = document.createElement('div');
     footer.className = 'dv-footer';
-    footer.textContent = '▲▼ navegar · ENTER abrir · TAB cerrar';
+    footer.textContent = 'ESC abrir/cerrar · ←→ pestañas · ENTER confirmar';
     frame.appendChild(footer);
 
     this.rootEl.appendChild(frame);
@@ -134,17 +153,26 @@ export class Digivice {
   }
 
   open2() {
+    if (this.open) return;
+    const battle = this.ctx.peek('battle');
+    if (battle && battle.running) return;
     this.open = true;
     this.rootEl.classList.remove('hidden');
+    if (document.pointerLockElement) {
+      this._ignoreUnlock = true;
+      document.exitPointerLock();
+    }
     this.events.emit('digivice:open', {});
-    // refrescar todos los paneles al abrir
+    this.events.emit('mode', { mode: 'digivice' });
     this._activateTab(this.tabIndex, false);
   }
 
   close() {
+    if (!this.open) return;
     this.open = false;
     this.rootEl.classList.add('hidden');
     this.events.emit('digivice:close', {});
+    this.events.emit('mode', { mode: 'explore' });
   }
 
   _toast(text) {
@@ -162,11 +190,20 @@ export class Digivice {
   }
 
   update() {
-    // Tab abre/cierra siempre (fuera de batalla)
     const input = this.ctx.input;
-    if (input.tap('digivice')) {
+    const battle = this.ctx.peek('battle');
+    const inBattle = !!(battle && battle.running);
+
+    // Esc / Tab: only the Digivice. Never a second pause card.
+    const toggle = input.tap('digivice') || input.tap('pause');
+    if (toggle) {
+      if (inBattle) {
+        // battle owns Esc as cancel; do not open Digivice
+        if (this.open) this.close();
+        return;
+      }
       if (this.open) this.close();
-      else if (this.ctx.get('battle') && !this.ctx.get('battle').running) this.open2();
+      else this.open2();
       return;
     }
     if (!this.open) return;
@@ -186,6 +223,7 @@ export class Digivice {
 
   resize() {}
   dispose() {
+    document.removeEventListener('pointerlockchange', this._onLockChange);
     if (this.rootEl && this.rootEl.parentNode) this.rootEl.parentNode.removeChild(this.rootEl);
   }
 }

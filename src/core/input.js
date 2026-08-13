@@ -18,7 +18,7 @@ export class Input {
     this._onKeyDown = (e) => {
       if (!PRESS.has(e.code)) TAPS.set(e.code, performance.now());
       PRESS.add(e.code);
-      if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+      if (['Tab', 'Space', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     };
     this._onKeyUp = (e) => PRESS.delete(e.code);
     this._onMouseMove = (e) => {

@@ -33,9 +33,16 @@ export class DigimonAnimator {
   }
 
   update(dt) {
+    const creature = this.model?.userData?.creature;
+    if (creature && creature.update) {
+      this._elapsed = (this._elapsed || 0) + dt;
+      creature.update(dt, this._elapsed);
+      return;
+    }
     this.t += dt;
     const u = Math.min(1, this.t / this.duration);
     const p = this.p;
+    if (!p || !p.head || !p.armL) return;
     const t = this.t;
 
     // reset transformaciones base cada frame (las animaciones son aditivas simples)
@@ -67,7 +74,14 @@ export class DigimonAnimator {
     p.armL.rotation.set(0, 0, 0); p.armR.rotation.set(0, 0, 0);
     p.legL.rotation.set(0, 0, 0); p.legR.rotation.set(0, 0, 0);
     p.tail.rotation.set(0, 0, 0);
-    if (p.earL) { p.earL.rotation.z = 0.35; p.earR.rotation.z = -0.35; }
+    if (p.earL && p.earR) {
+      p.earL.rotation.z = 0.25;
+      p.earR.rotation.z = -0.25;
+    }
+    if (p.wingL && p.wingR) {
+      p.wingL.rotation.z = 0;
+      p.wingR.rotation.z = 0;
+    }
   }
 
   _snapY(mesh) {
@@ -83,6 +97,11 @@ export class DigimonAnimator {
     p.torso.position.y = Math.sin(t * 2.2) * 0.015;
     p.head.rotation.z = Math.sin(t * 1.4) * 0.05;
     p.tail.rotation.y = Math.sin(t * 3) * 0.18;
+    if (p.wingL && p.wingR) {
+      const flap = Math.sin(t * 5) * 0.28;
+      p.wingL.rotation.z = flap;
+      p.wingR.rotation.z = -flap;
+    }
   }
 
   _walk(p, t) {

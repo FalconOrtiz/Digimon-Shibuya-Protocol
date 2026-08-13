@@ -59,7 +59,8 @@ export class EggsPanel {
       const row = document.createElement('div');
       row.className = 'dv-row';
       row.innerHTML = `
-        <span class="dv-row-name">🥚 ${e.name}</span>
+        <img class="dv-item-icon" src="/assets/items/egg.png" alt="">
+        <span class="dv-row-name">${e.name}</span>
         <div class="dv-bar"><div class="dv-bar-fill" style="width:${pct}%;background:#ffb84a"></div></div>
         <span class="dv-row-count">${pct}%</span>`;
       list.appendChild(row);

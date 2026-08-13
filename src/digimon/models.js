@@ -1,212 +1,160 @@
-// src/digimon/models.js — fábrica de digimons chibi procedurales.
-// Low-poly construido con primitivas (sin esqueletos): cuerpo redondeado,
-// cabeza grande, extremidades cortas. Las partes quedan referenciadas para
-// animarlas por código (anim.js).
-//
-// Estilo: SD / chibi — cabeza ~40% del alto, ojos grandes, cola y orejas
-// reconocibles por especie.
-
 import * as THREE from 'three';
+import { toon } from '../world/toon.js';
+import { buildFlaremon } from './Flaremon';
+import { buildEarwingmon } from './Earwingmon';
 
-const SKIN = {
-  agumon: {
-    // Prompt: naranja brillante, OJOS VERDES grandes, hocico corto con dientes blancos,
-    // garras blancas afiladas, cola corta y rechoncha
-    body: 0xe08030, belly: 0xffe0b0, dark: 0xb06020,
-    eyes: 0x2ec44a, eyeHighlight: 0xffffff,
-    scale: 1.0, yOff: 0.55
-  },
-  patamon: {
-    // Prompt: CREMA y naranja, OJOS AZULES grandes, orejas naranja tipo ala de
-    // murciélago, manos y pies NEGROS pequeños, cola corta, flotando
-    body: 0xf0e0c8, belly: 0xfff6e0, dark: 0xd07030,
-    ears: 0xe08030, eyes: 0x3a7ad8, eyeHighlight: 0xffffff,
-    limbs: 0x20242c,   // manos y pies negros
-    scale: 0.95, yOff: 0.5
+function eyes(g, x, y, z, iris, s = 0.09) {
+  const W = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, emissive: 0x333333 });
+  const I = new THREE.MeshStandardMaterial({ color: iris, roughness: 0.25, emissive: iris, emissiveIntensity: 0.3 });
+  const P = new THREE.MeshStandardMaterial({ color: 0x141414 });
+  const H = new THREE.MeshBasicMaterial({ color: 0xffffff });
+  for (const k of [-1, 1]) {
+    const e = new THREE.Mesh(new THREE.SphereGeometry(s, 12, 10), W);
+    e.position.set(k * x, y, z);
+    const ir = new THREE.Mesh(new THREE.SphereGeometry(s * 0.58, 10, 8), I);
+    ir.position.set(k * x, y, z + s * 0.55);
+    const pu = new THREE.Mesh(new THREE.SphereGeometry(s * 0.28, 8, 6), P);
+    pu.position.set(k * x, y - s * 0.03, z + s * 0.82);
+    const gl = new THREE.Mesh(new THREE.SphereGeometry(s * 0.14, 6, 6), H);
+    gl.position.set(k * x - s * 0.18, y + s * 0.22, z + s * 0.92);
+    g.add(e, ir, pu, gl);
   }
-};
-
-function std(color, rough = 0.85) {
-  return new THREE.MeshStandardMaterial({ color, roughness: rough, metalness: 0.0 });
 }
 
-function mesh(geo, mat, x = 0, y = 0, z = 0) {
-  const m = new THREE.Mesh(geo, mat);
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  return m;
-}
-
-// ---- Agumon: dinosaurio naranja rechoncho ----
-function buildAgumon(s = SKIN.agumon) {
+function buildAgumon() {
+  const skin = toon(0xe08030, 0.1);
+  const belly = toon(0xfff0d6, 0.06);
+  const claw = toon(0xf4efe6, 0.04);
   const g = new THREE.Group();
-  const parts = {};
-  const body = std(s.body), belly = std(s.belly), dark = std(s.dark), eyeM = std(s.eyes, 0.3);
-
-  // cuerpo
-  const torso = mesh(new THREE.SphereGeometry(0.55, 18, 14), body);
-  torso.scale.set(1, 0.92, 0.95);
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.28, 16, 12), skin);
+  torso.scale.set(1.15, 1.05, 0.95);
+  torso.castShadow = true;
   g.add(torso);
-  parts.torso = torso;
-
-  // barriga crema
-  const tum = mesh(new THREE.SphereGeometry(0.42, 14, 10), belly);
-  tum.scale.set(0.95, 0.8, 0.6);
-  tum.position.set(0, -0.05, 0.34);
+  const tum = new THREE.Mesh(new THREE.SphereGeometry(0.2, 12, 10), belly);
+  tum.scale.set(0.95, 1.0, 0.5);
+  tum.position.set(0, -0.02, 0.2);
   g.add(tum);
-
-  // cabeza (grande, chibi)
-  const head = mesh(new THREE.SphereGeometry(0.42, 18, 14), body);
-  head.position.set(0, 0.75, 0.06);
-  head.scale.set(1, 1.05, 0.95);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), skin);
+  head.position.set(0, 0.4, 0.06);
+  head.userData.baseY = 0.4;
+  head.castShadow = true;
   g.add(head);
-  parts.head = head;
-
-  // cresta de Agumon (3 picos)
-  const crestMat = std(s.body);
-  for (let i = 0; i < 3; i++) {
-    const spike = mesh(new THREE.ConeGeometry(0.09 + i * 0.015, 0.3, 6), crestMat);
-    spike.position.set((i - 1) * 0.12, 1.16, -0.05 + i * 0.02);
-    spike.rotation.x = 0.25;
-    g.add(spike);
-  }
-
-  // hocico
-  const snout = mesh(new THREE.SphereGeometry(0.2, 12, 10), body);
-  snout.scale.set(1, 0.8, 1.1);
-  snout.position.set(0, 0.66, 0.42);
+  const snout = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), skin);
+  snout.scale.set(1.15, 0.7, 1.1);
+  snout.position.set(0, 0.32, 0.28);
   g.add(snout);
-
-  // dientes
-  const teeth = mesh(new THREE.BoxGeometry(0.26, 0.05, 0.06), std(0xf5f5f0, 0.4));
-  teeth.position.set(0, 0.58, 0.52);
-  g.add(teeth);
-
-  // ojos grandes (VERDES para Agumon, según prompt)
-  const eyeGeo = new THREE.SphereGeometry(0.085, 10, 8);
-  const eyeL = mesh(eyeGeo, eyeM); eyeL.position.set(-0.17, 0.82, 0.38); g.add(eyeL);
-  const eyeR = mesh(eyeGeo.clone(), eyeM); eyeR.position.set(0.17, 0.82, 0.38); g.add(eyeR);
-  // brillo
-  const glint = std(s.eyeHighlight, 0.2);
-  const gl = mesh(new THREE.SphereGeometry(0.028, 6, 6), glint);
-  gl.position.set(-0.14, 0.85, 0.46); g.add(gl);
-  const gr = mesh(new THREE.SphereGeometry(0.028, 6, 6), glint);
-  gr.position.set(0.2, 0.85, 0.46); g.add(gr);
-
-  // brazos cortos
-  const armL = mesh(new THREE.SphereGeometry(0.16, 10, 8), body);
-  armL.position.set(-0.55, 0.25, 0.1); g.add(armL);
-  const armR = mesh(new THREE.SphereGeometry(0.16, 10, 8), body);
-  armR.position.set(0.55, 0.25, 0.1); g.add(armR);
-  // garras blancas afiladas (prompt)
-  const clawL = mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), std(0xf8f8f2));
-  clawL.position.set(-0.55, 0.11, 0.15); g.add(clawL);
-  const clawR = mesh(new THREE.BoxGeometry(0.07, 0.14, 0.07), std(0xf8f8f2));
-  clawR.position.set(0.55, 0.11, 0.15); g.add(clawR);
-  parts.armL = armL; parts.armR = armR; parts.clawL = clawL; parts.clawR = clawR;
-
-  // piernas
-  const legGeo = new THREE.SphereGeometry(0.18, 10, 8);
-  const legL = mesh(legGeo, body); legL.scale.set(1, 0.7, 1); legL.position.set(-0.24, -0.42, 0.08); g.add(legL);
-  const legR = mesh(legGeo.clone(), body); legR.scale.set(1, 0.7, 1); legR.position.set(0.24, -0.42, 0.08); g.add(legR);
-  parts.legL = legL; parts.legR = legR;
-
-  // cola gruesa
-  const tail = mesh(new THREE.SphereGeometry(0.14, 10, 8), dark);
-  tail.scale.set(1.6, 1, 1);
-  tail.position.set(0, 0.1, -0.62);
+  eyes(g, 0.1, 0.46, 0.26, 0x2ec44a, 0.075);
+  const armG = new THREE.CapsuleGeometry(0.07, 0.1, 4, 6);
+  const armL = new THREE.Mesh(armG, skin); armL.position.set(-0.32, 0.06, 0.05); armL.rotation.z = 0.4;
+  const armR = new THREE.Mesh(armG.clone(), skin); armR.position.set(0.32, 0.06, 0.05); armR.rotation.z = -0.4;
+  g.add(armL, armR);
+  const legG = new THREE.CapsuleGeometry(0.085, 0.1, 4, 6);
+  const legL = new THREE.Mesh(legG, skin); legL.position.set(-0.12, -0.34, 0.03);
+  const legR = new THREE.Mesh(legG.clone(), skin); legR.position.set(0.12, -0.34, 0.03);
+  g.add(legL, legR);
+  const cg = new THREE.ConeGeometry(0.022, 0.08, 5);
+  for (const [x, y, z] of [[-0.36, -0.08, 0.1], [0.36, -0.08, 0.1], [-0.12, -0.48, 0.12], [0.12, -0.48, 0.12]]) {
+    const c = new THREE.Mesh(cg, claw);
+    c.position.set(x, y, z); c.rotation.x = 1.05; g.add(c);
+  }
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), skin);
+  tail.scale.set(0.75, 0.65, 1.55);
+  tail.position.set(0, -0.04, -0.32);
   g.add(tail);
-  parts.tail = tail;
-
-  g.scale.setScalar(s.scale);
-  g.position.y = s.yOff;
-  g.userData.parts = parts;
+  g.scale.setScalar(1.05);
+  g.position.y = 0.52;
+  g.userData.parts = { torso, head, armL, armR, legL, legR, tail };
   return g;
 }
 
-// ---- Patamon: cría alada amarilla ----
-function buildPatamon(s = SKIN.patamon) {
+function buildPatamon() {
+  const cream = toon(0xf4e6cc, 0.08);
+  const orange = toon(0xe88828, 0.1);
+  const earM = toon(0xf07820, 0.08);
+  earM.side = THREE.DoubleSide;
   const g = new THREE.Group();
-  const parts = {};
-  const body = std(s.body), belly = std(s.belly), dark = std(s.dark), eyeM = std(s.eyes, 0.3);
-
-  // cuerpo (casi esfera)
-  const torso = mesh(new THREE.SphereGeometry(0.52, 18, 14), body);
-  torso.scale.set(1, 1.02, 0.96);
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.26, 14, 12), orange);
+  torso.castShadow = true;
   g.add(torso);
-  parts.torso = torso;
-
-  // barriga
-  const tum = mesh(new THREE.SphereGeometry(0.4, 14, 10), belly);
-  tum.scale.set(0.9, 0.78, 0.55);
-  tum.position.set(0, -0.08, 0.34);
-  g.add(tum);
-
-  // cabeza (fundida con el cuerpo, orejas arriba)
-  const head = mesh(new THREE.SphereGeometry(0.36, 16, 12), body);
-  head.position.set(0, 0.62, 0.1);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 12), cream);
+  head.position.set(0, 0.26, 0.06);
+  head.userData.baseY = 0.26;
   g.add(head);
-  parts.head = head;
-
-  // orejas grandes naranja tipo ala de murciélago (prompt: Wing-Ear Mammal)
-  const earGeo = new THREE.ConeGeometry(0.15, 0.48, 8);
-  const earL = mesh(earGeo, std(s.ears));
-  earL.position.set(-0.26, 1.02, -0.02);
-  earL.rotation.z = 0.35;
-  g.add(earL);
-  const earR = mesh(earGeo.clone(), std(s.ears));
-  earR.position.set(0.26, 1.02, -0.02);
-  earR.rotation.z = -0.35;
-  g.add(earR);
-  parts.earL = earL; parts.earR = earR;
-
-  // cara: ojos gigantes AZULES (prompt)
-  const eyeGeo = new THREE.SphereGeometry(0.1, 10, 8);
-  const eyeL = mesh(eyeGeo, std(s.eyes, 0.2)); eyeL.position.set(-0.16, 0.68, 0.36); g.add(eyeL);
-  const eyeR = mesh(eyeGeo.clone(), std(s.eyes, 0.2)); eyeR.position.set(0.16, 0.68, 0.36); g.add(eyeR);
-  const glint = std(s.eyeHighlight, 0.2);
-  const gl = mesh(new THREE.SphereGeometry(0.032, 6, 6), glint);
-  gl.position.set(-0.12, 0.71, 0.44); g.add(gl);
-  const gr = mesh(new THREE.SphereGeometry(0.032, 6, 6), glint);
-  gr.position.set(0.2, 0.71, 0.44); g.add(gr);
-
-  // pico/boca pequeña
-  const mouth = mesh(new THREE.BoxGeometry(0.12, 0.04, 0.04), std(0xd94a3a, 0.5));
-  mouth.position.set(0, 0.56, 0.42);
-  g.add(mouth);
-
-  // brazos cortitos NEGROS (prompt: tiny black hands)
-  const limbMat = std(s.limbs);
-  const armL = mesh(new THREE.SphereGeometry(0.13, 10, 8), limbMat);
-  armL.position.set(-0.48, 0.18, 0.12); g.add(armL);
-  const armR = mesh(new THREE.SphereGeometry(0.13, 10, 8), limbMat);
-  armR.position.set(0.48, 0.18, 0.12); g.add(armR);
-  parts.armL = armL; parts.armR = armR;
-
-  // piernas NEGRAS pequeñas (prompt)
-  const legGeo = new THREE.SphereGeometry(0.15, 10, 8);
-  const legL = mesh(legGeo, limbMat); legL.scale.set(1, 0.7, 1); legL.position.set(-0.2, -0.4, 0.1); g.add(legL);
-  const legR = mesh(legGeo.clone(), limbMat); legR.scale.set(1, 0.7, 1); legR.position.set(0.2, -0.4, 0.1); g.add(legR);
-  parts.legL = legL; parts.legR = legR;
-
-  // cola corta (prompt)
-  const tail = mesh(new THREE.SphereGeometry(0.09, 8, 6), std(s.dark));
-  tail.scale.set(1.3, 1, 1);
-  tail.position.set(0, 0.05, -0.55);
-  g.add(tail);
-  parts.tail = tail;
-
-  g.scale.setScalar(s.scale);
-  g.position.y = s.yOff;
-  g.userData.parts = parts;
+  eyes(g, 0.08, 0.3, 0.24, 0x3a7ad8, 0.07);
+  const ear = new THREE.ConeGeometry(0.1, 0.28, 6);
+  const earL = new THREE.Mesh(ear, earM); earL.position.set(-0.14, 0.42, 0); earL.rotation.z = 0.35;
+  const earR = new THREE.Mesh(ear.clone(), earM); earR.position.set(0.14, 0.42, 0); earR.rotation.z = -0.35;
+  g.add(earL, earR);
+  const wing = new THREE.CircleGeometry(0.2, 6, 0, Math.PI);
+  const wingL = new THREE.Mesh(wing, earM); wingL.position.set(-0.22, 0.06, -0.04); wingL.rotation.y = 0.6;
+  const wingR = new THREE.Mesh(wing.clone(), earM); wingR.position.set(0.22, 0.06, -0.04); wingR.rotation.y = -0.6;
+  g.add(wingL, wingR);
+  const armL = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), orange); armL.position.set(-0.22, 0, 0.08);
+  const armR = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), orange); armR.position.set(0.22, 0, 0.08);
+  const legL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), orange); legL.position.set(-0.09, -0.24, 0.04);
+  const legR = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), orange); legR.position.set(0.09, -0.24, 0.04);
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.055, 6, 6), orange); tail.position.set(0, -0.04, -0.26);
+  g.add(armL, armR, legL, legR, tail);
+  g.scale.setScalar(1.0);
+  g.position.y = 0.72;
+  g.userData.parts = { torso, head, armL, armR, legL, legR, tail, earL, earR, wingL, wingR };
   return g;
 }
 
-// ---- factory ----
+function buildWild(id) {
+  const pal = { koromon: 0xffb0a0, nyaromon: 0xffd27a, bukamon: 0x7ac0ff }[id] || 0xcccccc;
+  const m = toon(pal, 0.08);
+  const g = new THREE.Group();
+  const torso = new THREE.Mesh(new THREE.SphereGeometry(0.24, 12, 10), m);
+  g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 10, 8), m);
+  head.position.set(0, 0.2, 0.05);
+  head.userData.baseY = 0.2;
+  g.add(head);
+  eyes(g, 0.06, 0.22, 0.16, 0x222222, 0.05);
+  const armL = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), m); armL.position.set(-0.2, 0.02, 0.06);
+  const armR = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), m); armR.position.set(0.2, 0.02, 0.06);
+  const legL = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), m); legL.position.set(-0.08, -0.2, 0.03);
+  const legR = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 6), m); legR.position.set(0.08, -0.2, 0.03);
+  const tail = new THREE.Mesh(new THREE.SphereGeometry(0.06, 6, 6), m); tail.position.set(0, 0, -0.22);
+  g.add(armL, armR, legL, legR, tail);
+  g.position.y = 0.32;
+  g.userData.parts = { torso, head, armL, armR, legL, legR, tail };
+  return g;
+}
+
+function wrapGrounded(creature, scale) {
+  const inner = creature.group;
+  inner.scale.setScalar(scale);
+  inner.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(inner);
+  inner.position.y = -box.min.y;
+  const wrap = new THREE.Group();
+  wrap.add(inner);
+  wrap.userData.species = inner.name;
+  wrap.userData.creature = creature;
+  wrap.userData.parts = { torso: wrap, head: wrap };
+  wrap.userData.grounded = true;
+  return wrap;
+}
+
 export function buildDigimon(species) {
-  const model = species === 'agumon' ? buildAgumon(SKIN.agumon) : buildPatamon(SKIN.patamon);
+  if (species === 'agumon') {
+    const model = wrapGrounded(buildFlaremon(), 2.8);
+    model.userData.species = species;
+    return model;
+  }
+  if (species === 'patamon') {
+    const model = wrapGrounded(buildEarwingmon(), 2.4);
+    model.userData.species = species;
+    return model;
+  }
+  const model = buildWild(species);
   model.userData.species = species;
   return model;
 }
 
-export const DIGIMON_COLORS = SKIN;
+export const DIGIMON_COLORS = {
+  agumon: { body: 0xe08030, belly: 0xfff0d6, eyes: 0x2ec44a },
+  patamon: { body: 0xf4e6cc, ears: 0xf07820, eyes: 0x3a7ad8 }
+};

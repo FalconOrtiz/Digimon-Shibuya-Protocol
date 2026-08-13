@@ -11,11 +11,14 @@ export class ProfilePanel {
     const t = this.trainer;
     const card = document.createElement('div');
     card.className = 'dv-card dv-profile';
+    const p = this.ctx.get('player');
+    const cfg = this.ctx.config.player;
     card.innerHTML = `
-      <div class="dv-profile-avatar">👤</div>
+      <div class="dv-profile-avatar">F</div>
       <div class="dv-profile-info">
         <div class="dv-card-name">${t.name}</div>
         <div class="dv-wl">Victorias: <b>${t.wins}</b> · Derrotas: <b>${t.losses}</b></div>
+        <div class="dv-wl">Vida ${Math.round(p.hp)}/${cfg.hp} · Energía ${Math.round(p.stamina)}/${cfg.staminaMax}</div>
       </div>
     `;
     el.appendChild(card);

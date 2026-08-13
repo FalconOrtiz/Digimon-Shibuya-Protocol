@@ -13,7 +13,7 @@ await page.waitForTimeout(3000);
 
 await page.evaluate(() => {
   const g = window.__game;
-  g.ctx.get('daynight').hour = 18.75;   // hora azul
+  g.ctx.get('daynight').hour = 17.0;   // golden hour cartoon
   const cam = g.engine.camera;
   cam.position.set(0, 1.7, 16);
   cam.lookAt(0, 1.5, 0);

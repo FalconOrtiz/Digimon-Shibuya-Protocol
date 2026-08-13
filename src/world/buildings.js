@@ -1,230 +1,349 @@
-// src/world/buildings.js — kit modular de edificios de Shibuya.
-// Fachadas procedurales (retícula de ventanas), tiendas en planta baja,
-// pantallas LED gigantes, marquesinas de neón. Todo generado en código.
-
+// CityBlocks port from Paulius (D:\Digimon\game): setback towers,
+// TextureLab window facade, rounded volumes. Video ads only on QFRONT + TSUTAYA.
 import * as THREE from 'three';
-import { facadeTex, neonSignTex, ledBillboardTex, brighten } from './tex.js';
+import { roundedBox } from '../fx/Sculpt';
+import { bakeColorMap, cached } from '../core/TextureLab';
+import { makeRng } from '../core/Noise';
+import { imagineVideo, IMAGINE } from './imagine-atlas.js';
+
+const FACADE_PALETTE = [0x6a5a68, 0x7a6868, 0x6a5860, 0x7a6a62, 0x645c6c, 0x7a7070];
+const BILLBOARD_COLORS = [0x4de1ff, 0xff4dc8, 0xffd24a, 0xff8a3a, 0x7a6aff, 0x4aff8a];
+
+const facadeTex = cached('shibuya-facade', () =>
+  bakeColorMap({
+    size: 256,
+    color: (u, v) => {
+      const r = makeRng(Math.floor(u * 24) * 7 + Math.floor(v * 32) * 13 + 11);
+      const lit = r() < 0.5;
+      if (lit) {
+        const w = (r() - 0.5) * 0.08;
+        return [0xf0 / 255 + w, 0xd8 / 255 + w, 0xa8 / 255 + w];
+      }
+      const w = (r() - 0.5) * 0.05;
+      return [0x2e / 255 + w, 0x32 / 255 + w, 0x44 / 255 + w];
+    }
+  })
+);
 
 export class Buildings {
   static id = 'buildings';
   static deps = ['world'];
 
-  constructor() { this.root = new THREE.Group(); this.colliders = []; }
+  constructor() { this.root = new THREE.Group(); this.colliders = []; this.windowMats = []; }
 
   init(ctx) {
     this.ctx = ctx;
-    this.rng = ctx.rng.fork();
     this.world = ctx.get('world');
     this.world.root.add(this.root);
     this._buildAll();
+    if (ctx.events) {
+      ctx.events.on('world:time', () => {
+        const nf = ctx.peek('daynight')?.nightFactor ?? 0.5;
+        for (const m of this.windowMats) m.emissiveIntensity = 0.12 + 0.55 * nf;
+      });
+    }
     return this;
   }
 
   _buildAll() {
     const bs = 48;
-    const half = bs / 2;
-    // Disposición basada en el cruce real de Shibuya (lat 35.6595, lon 139.7005):
-    //   N  (z negativo, hacia Aoyama/Omotesando): Tsutaya a la izquierda, edificios de oficinas
-    //   S  (z positivo, hacia Center-gai): el 109 a la izquierda-sur, Love Hotel Hill a la derecha
-    //   E  (x positivo, hacia Miyamasuzaka): QFRONT con su pantalla gigante, Hikarie más allá
-    //   W  (x negativo, hacia Hachiko/estación): Scramble Square (la torre más alta), Dogenzaka
     const spots = [
-      // esquinas del cruce
-      { x: -bs, z: -bs, h: 52, kind: 'tower', neon: 'SCRAMBLE SQ', led: true, w: bs * 0.92, d: bs * 0.92 },  // NO: Scramble Square (torre alta)
-      { x: bs, z: -bs, h: 34, kind: 'tower', neon: 'QFRONT', led: true, ledBig: true, w: bs * 0.92, d: bs * 0.92 }, // NE: QFRONT pantalla gigante
-      { x: -bs, z: bs, h: 30, kind: 'retail', neon: '109', led: true, w: bs * 0.92, d: bs * 0.92 },       // SO: Shibuya 109
-      { x: bs, z: bs, h: 26, kind: 'office', neon: 'HIKARIE', led: false, w: bs * 0.92, d: bs * 0.92 },   // SE: Hikarie
-      // corona exterior (calles que salen del cruce)
-      { x: -bs * 2, z: -bs * 2, h: 22, kind: 'office', w: bs * 0.9, d: bs * 0.9 },   // noroeste lejano (Dogenzaka arriba)
-      { x: 0, z: -bs * 2, h: 24, kind: 'office', neon: 'TSUTAYA', neonColor: '#5aff7d', w: bs * 0.9, d: bs * 0.9 },  // norte: Tsutaya (franja verde)
-      { x: bs * 2, z: -bs * 2, h: 28, kind: 'tower', w: bs * 0.9, d: bs * 0.9 },      // noreste lejano (Miyamasuzaka)
-      { x: -bs * 2, z: 0, h: 20, kind: 'office', neon: 'DOGENZAKA', w: bs * 0.9, d: bs * 0.9 },  // oeste: Dogenzaka
-      { x: bs * 2, z: 0, h: 24, kind: 'office', neon: 'MIYAMASUZAKA', w: bs * 0.9, d: bs * 0.9 },  // este: Miyamasuzaka
-      { x: -bs * 2, z: bs * 2, h: 18, kind: 'retail', neon: 'LOVE HOTEL', w: bs * 0.9, d: bs * 0.9 },  // sur-oeste (Love Hotel Hill)
-      { x: 0, z: bs * 2, h: 16, kind: 'retail', neon: 'CENTER-GAI', w: bs * 0.9, d: bs * 0.9 },      // sur: Center-gai
-      { x: bs * 2, z: bs * 2, h: 30, kind: 'tower', neon: 'STARBUCKS', neonColor: '#5aff7d', w: bs * 0.9, d: bs * 0.9 },  // sureste: Starbucks (verde) 
+      { x: -bs, z: -bs, h: 52, neon: 'SCRAMBLE SQ', neonColor: 0x4de1ff, style: 'crown', w: 36, d: 36 },
+      { x: bs, z: -bs, h: 34, neon: 'QFRONT', neonColor: 0xff4dc8, screen: 'video', video: IMAGINE.ads.qfront, w: 36, d: 36 },
+      { x: -bs, z: bs, h: 30, neon: '109', neonColor: 0x4de1ff, style: 'cylinder', w: 36, d: 36 },
+      { x: bs, z: bs, h: 26, neon: 'HIKARIE', neonColor: 0xff4dc8, w: 36, d: 36 },
+      { x: -bs * 2, z: -bs * 2, h: 22, w: 34, d: 34 },
+      { x: 0, z: -bs * 2, h: 24, neon: 'TSUTAYA', neonColor: 0x4de1ff, screen: 'video', video: IMAGINE.ads.digitonic, w: 34, d: 34 },
+      { x: bs * 2, z: -bs * 2, h: 28, w: 34, d: 34 },
+      { x: -bs * 2, z: 0, h: 20, neon: 'DOGENZAKA', w: 34, d: 34 },
+      { x: bs * 2, z: 0, h: 24, neon: 'MIYAMASUZAKA', w: 34, d: 34 },
+      { x: -bs * 2, z: bs * 2, h: 18, neon: 'LOVE HOTEL', w: 34, d: 34 },
+      { x: 0, z: bs * 2, h: 16, neon: 'CENTER-GAI', w: 34, d: 34 },
+      { x: bs * 2, z: bs * 2, h: 30, neon: 'STARBUCKS', neonColor: 0x5aff7d, w: 34, d: 34 }
     ];
 
     for (const s of spots) {
-      const b = this._buildBuilding(s);
-      this.root.add(b.group);
+      this.root.add(this._buildBuilding(s));
       this.colliders.push({ x: s.x - s.w / 2, z: s.z - s.d / 2, w: s.w, d: s.d, h: s.h });
     }
-
-    // estatua Hachiko: salida oeste del cruce, junto a la estación (frente a Scramble Square)
     this._buildHachiko();
   }
 
   _buildBuilding(s) {
-    const group = new THREE.Group();
+    const g = new THREE.Group();
     const { w, d, h } = s;
-    const rng = this.rng.fork();
-    const seed = rng.int(1, 999);
-
-    // base de la torre — paleta desaturada violeta/marrón (Art Bible, ref #604848/#786060)
-    const palette = [
-      '#786878', '#8a7878', '#786068', '#887870', '#706878', '#8a8080', '#786880', '#988078'
-    ];
-    const facade = facadeTex({
-      base: palette[rng.int(0, palette.length - 1)],
-      frame: '#5a5458',
-      win: '#f0d8a8', winDark: '#6a5a58',   // ventanas cálidas doradas (ref #f0d8a8)
-      rows: Math.max(4, Math.floor(h / 5)), cols: Math.max(3, Math.floor(w / 6)),
-      litChance: 0.55, seed, size: 512      // más ventanas encendidas (ciudad viva de noche)
+    const rng = makeRng(s.x * 31 + s.z * 17 + 5);
+    const base = FACADE_PALETTE[Math.floor(rng() * FACADE_PALETTE.length)];
+    const wall = new THREE.MeshStandardMaterial({
+      color: base, map: facadeTex, roughness: 0.72, metalness: 0.06
     });
-    const box = new THREE.Mesh(
-      new THREE.BoxGeometry(w, h, d),
-      new THREE.MeshStandardMaterial({
-        map: facade,
-        roughness: 0.75,
-        metalness: 0.05,
-        emissive: 0x2a2028,          // la ciudad emite luz propia en hora azul
-        emissiveIntensity: 0.55
+
+    const baseH = h * 0.55;
+    const baseBody = new THREE.Mesh(roundedBox(w, baseH, d, 1.2, 3), wall);
+    baseBody.position.y = baseH / 2;
+    baseBody.castShadow = true;
+    baseBody.receiveShadow = true;
+    g.add(baseBody);
+
+    const towerW = w * 0.72;
+    const towerD = d * 0.72;
+    const towerH = h - baseH + 1.5;
+    const towerY = baseH + towerH / 2 - 0.75;
+    const towerBody = new THREE.Mesh(roundedBox(towerW, towerH, towerD, 1.0, 3), wall);
+    towerBody.position.y = towerY;
+    towerBody.castShadow = true;
+    towerBody.receiveShadow = true;
+    g.add(towerBody);
+
+    if (s.style === 'cylinder') {
+      const cyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(w * 0.34, w * 0.4, h, 20, 1, true),
+        new THREE.MeshStandardMaterial({
+          color: base, map: facadeTex, roughness: 0.65, metalness: 0.1, side: THREE.DoubleSide
+        })
+      );
+      cyl.position.y = h / 2;
+      cyl.castShadow = true;
+      g.add(cyl);
+      const cylTop = new THREE.Mesh(
+        new THREE.CylinderGeometry(w * 0.34, w * 0.34, 1.2, 20),
+        new THREE.MeshStandardMaterial({ color: 0x4a4050, roughness: 0.6 })
+      );
+      cylTop.position.y = h + 0.6;
+      g.add(cylTop);
+    } else if (s.style === 'crown') {
+      const crown = new THREE.Mesh(
+        roundedBox(towerW * 0.7, 2.2, towerD * 0.7, 0.4, 2),
+        new THREE.MeshStandardMaterial({
+          color: 0x2a3040, roughness: 0.4, metalness: 0.2,
+          emissive: 0x4de1ff, emissiveIntensity: 0.9
+        })
+      );
+      crown.position.y = towerY + towerH / 2 + 1.1;
+      g.add(crown);
+      const spire = new THREE.Mesh(
+        new THREE.ConeGeometry(1.0, 3.2, 8),
+        new THREE.MeshStandardMaterial({ color: 0x6a6a78, roughness: 0.5, metalness: 0.3 })
+      );
+      spire.position.y = towerY + towerH / 2 + 3.5;
+      g.add(spire);
+    }
+
+    const cornice = new THREE.Mesh(
+      roundedBox(w + 0.8, 1.4, d + 0.8, 0.5, 2),
+      new THREE.MeshStandardMaterial({ color: 0x4a4450, roughness: 0.6, metalness: 0.12 })
+    );
+    cornice.position.y = baseH - 0.7;
+    g.add(cornice);
+
+    const shop = new THREE.Mesh(
+      roundedBox(w * 0.9, 4.2, d * 0.9, 0.8, 2),
+      new THREE.MeshStandardMaterial({ color: 0x2a2834, roughness: 0.55, metalness: 0.08 })
+    );
+    shop.position.y = 2.1;
+    g.add(shop);
+    this._storefront(g, w * 0.82, d * 0.82, 2.1);
+
+    this._windows(g, towerW, towerD, baseH + 1.2, h - 2.2, 5, 5);
+    this._windows(g, w * 0.92, d * 0.92, 5.2, baseH - 1.4, 3, 6);
+
+    if (s.neon) {
+      const zf = d * 0.5 + 0.06;
+      const sign = this._neonSign(s.neon, s.neonColor ?? 0x4de1ff, w * 0.55);
+      sign.position.set(0, 5.6, zf);
+      g.add(sign);
+      const sign2 = sign.clone();
+      sign2.position.set(0, 5.6, -zf);
+      sign2.rotation.y = Math.PI;
+      g.add(sign2);
+    }
+
+    const billCount = 2 + Math.floor(rng() * 2);
+    const faceZ = towerD * 0.5 + 0.07;
+    for (let b = 0; b < billCount; b++) {
+      const color = BILLBOARD_COLORS[Math.floor(rng() * BILLBOARD_COLORS.length)];
+      const bw = 2.0 + rng() * 1.2;
+      const bh = 1.2 + rng() * 0.6;
+      const bz = (b % 2 === 0 ? 1 : -1) * faceZ;
+      const by = baseH + 3 + rng() * Math.max(3, towerH - 8);
+      const bx = (rng() - 0.5) * towerW * 0.45;
+      const bill = this._billboard(color, bw, bh);
+      bill.position.set(bx, by, bz);
+      bill.rotation.y = bz > 0 ? 0 : Math.PI;
+      g.add(bill);
+    }
+
+    if (s.screen === 'video' && s.video) this._videoScreen(g, s, towerW, towerD, h, baseH);
+
+    g.position.set(s.x, 0, s.z);
+    return g;
+  }
+
+  _neonSign(text, color, width) {
+    const tex = cached(`neon-${text}-${color.toString(16)}`, () =>
+      bakeColorMap({
+        size: 256,
+        color: (u, v) => {
+          const r = ((color >> 16) & 255) / 255;
+          const gg = ((color >> 8) & 255) / 255;
+          const b = (color & 255) / 255;
+          const band = Math.abs(v - 0.5) < 0.18 && Math.abs(u - 0.5) < 0.42;
+          const rnd = makeRng(Math.floor(u * 64) * 3 + Math.floor(v * 64) * 5 + 1)();
+          if (band && rnd > 0.25) {
+            const glow = 0.75 + rnd * 0.25;
+            return [r * glow, gg * glow, b * glow];
+          }
+          return [0.04, 0.04, 0.06];
+        }
       })
     );
-    box.position.y = h / 2;
-    box.castShadow = true;
-    box.receiveShadow = true;
-    group.add(box);
+    return new THREE.Mesh(new THREE.PlaneGeometry(width, 3.2), new THREE.MeshBasicMaterial({ map: tex }));
+  }
 
-    // cornisa superior
-    const cornice = new THREE.Mesh(
-      new THREE.BoxGeometry(w + 0.6, 1.2, d + 0.6),
-      new THREE.MeshStandardMaterial({ color: 0x887766, roughness: 0.7, metalness: 0.1 })
+  _billboard(color, width, height) {
+    const tex = cached(`bill-${color.toString(16)}-${Math.round(width * 10)}`, () =>
+      bakeColorMap({
+        size: 128,
+        color: (u, v) => {
+          const r = ((color >> 16) & 255) / 255;
+          const gg = ((color >> 8) & 255) / 255;
+          const b = (color & 255) / 255;
+          const rnd = makeRng(Math.floor(u * 8) * 5 + Math.floor(v * 8) * 9 + 2)();
+          const band = Math.abs(u - 0.5) < 0.42 && Math.abs(v - 0.5) < 0.36;
+          if (band) {
+            const glow = 0.7 + rnd * 0.3;
+            return [r * glow, gg * glow, b * glow];
+          }
+          return [0.04, 0.04, 0.06];
+        }
+      })
     );
-    cornice.position.y = h + 0.6;
-    group.add(cornice);
+    return new THREE.Mesh(new THREE.PlaneGeometry(width, height), new THREE.MeshBasicMaterial({ map: tex }));
+  }
 
-    // azotea con aparatos (cajas pequeñas)
-    const roofRng = rng.fork();
-    for (let i = 0; i < 4; i++) {
-      const rw = 1 + roofRng.float() * 2.5, rd = 1 + roofRng.float() * 2.5;
-      const unit = new THREE.Mesh(
-        new THREE.BoxGeometry(rw, 0.8 + roofRng.float() * 1.2, rd),
-        new THREE.MeshStandardMaterial({ color: 0x55555a, roughness: 0.8 })
-      );
-      unit.position.set((roofRng.float() - 0.5) * w * 0.5, h + 1.6, (roofRng.float() - 0.5) * d * 0.5);
-      unit.castShadow = true;
-      group.add(unit);
+  _glass() {
+    const m = new THREE.MeshPhysicalMaterial({
+      color: 0x7aa0b8,
+      roughness: 0.14,
+      metalness: 0.06,
+      transparent: true,
+      opacity: 0.58,
+      emissive: 0xf0d8a8,
+      emissiveIntensity: 0.32
+    });
+    this.windowMats.push(m);
+    return m;
+  }
+
+  _windows(g, fw, fd, y0, span, rows, cols) {
+    if (span < 2) return;
+    const glass = this._glass();
+    const frameM = new THREE.MeshStandardMaterial({ color: 0x2a2830, roughness: 0.55 });
+    const faces = [
+      { x: 0, z: fd / 2 + 0.05, ry: 0, pw: fw * 0.86 },
+      { x: 0, z: -fd / 2 - 0.05, ry: Math.PI, pw: fw * 0.86 },
+      { x: fw / 2 + 0.05, z: 0, ry: Math.PI / 2, pw: fd * 0.86 },
+      { x: -fw / 2 - 0.05, z: 0, ry: -Math.PI / 2, pw: fd * 0.86 }
+    ];
+    const cellW = 0.72;
+    const cellH = Math.min(1.15, span / rows * 0.7);
+    for (const f of faces) {
+      const usable = f.pw * 0.9;
+      const n = Math.max(3, Math.min(cols, Math.floor(usable / 1.05)));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < n; c++) {
+          const u = (c + 0.5) / n - 0.5;
+          const y = y0 + (r + 0.5) * (span / rows);
+          const pane = new THREE.Mesh(new THREE.PlaneGeometry(cellW, cellH), glass);
+          const fx = f.ry === 0 || f.ry === Math.PI ? u * usable : 0;
+          const fz = f.ry === Math.PI / 2 || f.ry === -Math.PI / 2 ? u * usable : 0;
+          pane.position.set(f.x + fx, y, f.z + fz);
+          pane.rotation.y = f.ry;
+          g.add(pane);
+          if ((r + c) % 3 === 0) {
+            const fr = new THREE.Mesh(roundedBox(cellW + 0.06, cellH + 0.06, 0.05, 0.01, 1), frameM);
+            fr.position.copy(pane.position);
+            fr.rotation.y = f.ry;
+            g.add(fr);
+          }
+        }
+      }
     }
+  }
 
-    // planta baja: tienda con escaparate (cálido cartoon)
-    const shop = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.94, 4.5, d * 0.94),
-      new THREE.MeshStandardMaterial({ color: 0x6a5a4a, roughness: 0.6, metalness: 0.05 })
+  _storefront(g, w, d, y) {
+    // glass storefront on the shop volume
+    const glass = this._glass();
+    const faces = [
+      { x: 0, z: d / 2 + 0.05, ry: 0, pw: w * 0.88 },
+      { x: 0, z: -d / 2 - 0.05, ry: Math.PI, pw: w * 0.88 }
+    ];
+    for (const f of faces) {
+      const pane = new THREE.Mesh(new THREE.PlaneGeometry(f.pw, 2.4), glass);
+      pane.position.set(f.x, y, f.z);
+      pane.rotation.y = f.ry;
+      g.add(pane);
+      for (let i = -1; i <= 1; i++) {
+        const bar = new THREE.Mesh(
+          roundedBox(0.06, 2.4, 0.06, 0.01, 1),
+          new THREE.MeshStandardMaterial({ color: 0x2a2830, roughness: 0.5 })
+        );
+        bar.position.set(f.x + (f.ry === 0 ? i * f.pw * 0.3 : 0), y, f.z);
+        g.add(bar);
+      }
+    }
+  }
+
+  _videoScreen(group, s, w, d, h) {
+    const face = Math.max(w, d) * 0.5 + 0.08;
+    let pos, ry;
+    if (s.z < -1 && Math.abs(s.z) >= Math.abs(s.x) * 0.55) {
+      pos = [0, h * 0.52, face]; ry = 0;
+    } else if (s.x > 0) {
+      pos = [-face, h * 0.52, 0]; ry = -Math.PI / 2;
+    } else {
+      pos = [face, h * 0.52, 0]; ry = Math.PI / 2;
+    }
+    const lw = s.neon === 'QFRONT' ? w * 0.78 : w * 0.62;
+    const lh = s.neon === 'QFRONT' ? h * 0.38 : h * 0.3;
+    const holder = new THREE.Group();
+    holder.add(new THREE.Mesh(
+      roundedBox(lw + 0.4, lh + 0.4, 0.22, 0.08, 2),
+      new THREE.MeshStandardMaterial({ color: 0x1a1c22, roughness: 0.4, metalness: 0.4 })
+    ));
+    const panel = new THREE.Mesh(
+      new THREE.PlaneGeometry(lw, lh),
+      new THREE.MeshBasicMaterial({ map: imagineVideo(s.video), toneMapped: false })
     );
-    shop.position.y = 2.25;
-    group.add(shop);
-
-    // escaparate luminoso cálido
-    const glow = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.8, 3, d * 0.8),
-      new THREE.MeshStandardMaterial({ color: 0xfff0c8, emissive: 0xffd898, emissiveIntensity: 0.9, roughness: 0.4 })
-    );
-    glow.position.y = 2.6;
-    group.add(glow);
-
-    // letrero de neón sobre la tienda
-    if (s.neon) {
-      const neonColor = s.neonColor || ['#ff3b6b', '#3bd0ff', '#ffe23b', '#9b6bff'][rng.int(0, 3)];
-      const signTex = neonSignTex(s.neon, { color: neonColor, size: 256 });
-      const sign = new THREE.Mesh(
-        new THREE.PlaneGeometry(w * 0.7, 3),
-        new THREE.MeshBasicMaterial({ map: signTex, transparent: true })
-      );
-      sign.position.set(0, 5.5, d / 2 + 0.05);
-      group.add(sign);
-      // también en el lado opuesto
-      const sign2 = sign.clone();
-      sign2.position.z = -d / 2 - 0.05;
-      sign2.rotation.y = Math.PI;
-      group.add(sign2);
-    }
-
-    // pantalla LED gigante en fachada (solo edificios "led")
-    if (s.led) {
-      const ledTex = ledBillboardTex(s.neon || 'DIGIMON', { color: '#4dd0ff', size: 512 });
-      // QFRONT: pantalla extra grande (el famoso display del cruce)
-      const lw = s.ledBig ? w * 0.92 : w * 0.72;
-      const lh = s.ledBig ? h * 0.38 : h * 0.22;
-      const ly = s.ledBig ? h * 0.55 : h * 0.62;
-      const led = new THREE.Mesh(
-        new THREE.PlaneGeometry(lw, lh),
-        new THREE.MeshBasicMaterial({ map: ledTex })
-      );
-      led.position.set(0, ly, d / 2 + 0.1);
-      group.add(led);
-      const led2 = led.clone();
-      led2.position.z = -d / 2 - 0.1;
-      led2.rotation.y = Math.PI;
-      group.add(led2);
-    }
-
-    // reflejo del neón en el asfalto mojado (clon invertido + opacidad baja)
-    if (s.neon) {
-      const refTex = neonSignTex(s.neon, { color: s.neonColor || '#3bd0ff', size: 128 });
-      const ref = new THREE.Mesh(
-        new THREE.PlaneGeometry(w * 0.55, 5),
-        new THREE.MeshBasicMaterial({ map: refTex, transparent: true, opacity: 0.16, depthWrite: false })
-      );
-      ref.rotation.x = -Math.PI / 2;
-      ref.rotation.z = Math.PI;   // invertido: se "refleja" hacia el cruce
-      ref.position.set(0, 0.045, d / 2 + 6.5);
-      group.add(ref);
-    }
-
-    group.position.set(s.x, 0, s.z);
-    return { group };
+    panel.position.z = 0.13;
+    holder.add(panel);
+    holder.position.set(pos[0], pos[1], pos[2]);
+    holder.rotation.y = ry;
+    group.add(holder);
   }
 
   _buildHachiko() {
-    // estatua chibi de Hachiko: base + perro sentado (cajas)
     const g = new THREE.Group();
-    const base = new THREE.Mesh(
-      new THREE.BoxGeometry(1.6, 1.1, 1.6),
-      new THREE.MeshStandardMaterial({ color: 0x8a8578, roughness: 0.9 })
-    );
-    base.position.y = 0.55;
-    base.castShadow = true;
+    const bronze = new THREE.MeshStandardMaterial({ color: 0x8a7a5a, roughness: 0.8, metalness: 0.2 });
+    const base = new THREE.Mesh(roundedBox(1.4, 0.9, 1.4, 0.3, 2), bronze);
+    base.position.y = 0.45;
     g.add(base);
-
-    const body = new THREE.Mesh(
-      new THREE.BoxGeometry(0.7, 0.7, 0.9),
-      new THREE.MeshStandardMaterial({ color: 0xc9a87a, roughness: 0.9 })
-    );
-    body.position.set(0, 1.1 + 0.35, 0);
+    const body = new THREE.Mesh(roundedBox(0.7, 0.7, 0.9, 0.25, 2), bronze);
+    body.position.y = 1.1;
     g.add(body);
-
-    const head = new THREE.Mesh(
-      new THREE.BoxGeometry(0.5, 0.45, 0.5),
-      new THREE.MeshStandardMaterial({ color: 0xc9a87a, roughness: 0.9 })
-    );
-    head.position.set(0, 1.1 + 0.35 + 0.5, 0.15);
+    const head = new THREE.Mesh(roundedBox(0.5, 0.45, 0.5, 0.2, 2), bronze);
+    head.position.set(0, 1.6, 0.1);
     g.add(head);
-
-    // placa
-    const plate = new THREE.Mesh(
-      new THREE.BoxGeometry(0.8, 0.15, 0.1),
-      new THREE.MeshStandardMaterial({ color: 0xd9c9a0, emissive: 0x8a7a50, emissiveIntensity: 0.3 })
-    );
-    plate.position.set(0, 1.1 + 0.08, 0.82);
-    g.add(plate);
-
-    // salida oeste del cruce: entre el cruce y Scramble Square, frente a la estación
-    // (posición real: Hachiko está en la esquina NO del cruce, junto a la boca de la estación)
-    g.position.set(-24.5, 0, -8.5);
+    g.position.set(-24, 0, -8);
     this.root.add(g);
   }
 
-  // colisión AABB contra edificios
   collide(pos, radius = 0.5) {
     for (const c of this.colliders) {
       const nx = Math.max(c.x, Math.min(pos.x, c.x + c.w));
       const nz = Math.max(c.z, Math.min(pos.z, c.z + c.d));
       const dx = pos.x - nx, dz = pos.z - nz;
-      if (dx * dx + dz * dz < radius * radius) {
-        return { hit: true, nx, nz };
-      }
+      if (dx * dx + dz * dz < radius * radius) return { hit: true, nx, nz };
     }
     return { hit: false };
   }

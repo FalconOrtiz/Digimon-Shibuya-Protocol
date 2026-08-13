@@ -28,7 +28,7 @@ export class Engine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 2.5;   // Art Bible: brillo medio objetivo ~120
+    this.renderer.toneMappingExposure = 1.05;
 
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.Fog(0x0a0e1a, 40, this.q.far);
@@ -126,7 +126,9 @@ export class Engine {
 
     this.time.elapsed += dt;
     this.time.frame++;
-    this.renderer.render(this.scene, this.camera);
+    const render = this.systems.get('render');
+    if (render && render.draw) render.draw();
+    else this.renderer.render(this.scene, this.camera);
   }
 
   dispose() {

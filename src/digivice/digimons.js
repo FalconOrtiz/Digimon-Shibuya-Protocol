@@ -16,8 +16,10 @@ export class DigimonsPanel {
       const card = document.createElement('div');
       card.className = 'dv-card';
       const hpPct = Math.round((m.hp / m.maxHp) * 100);
+      const portrait = s.id === 'patamon' ? '/assets/patamon-sprite.png' : '/assets/agumon-sprite.png';
       card.innerHTML = `
         <div class="dv-card-head">
+          <img src="${portrait}" alt="" style="width:48px;height:48px;object-fit:contain">
           <span class="dv-card-name" style="color:#${s.color.toString(16).padStart(6,'0')}">${s.name}</span>
           <span class="dv-card-lv">NV.${m.level}</span>
         </div>

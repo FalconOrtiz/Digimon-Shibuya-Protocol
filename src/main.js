@@ -2,9 +2,11 @@
 // Crea el engine, registra todos los sistemas en orden de deps y arranca.
 
 import { createEngine } from './core/engine.js';
+import { RenderSystem } from './render/index.js';
 import { Shibuya } from './world/shibuya.js';
 import { Buildings } from './world/buildings.js';
 import { Props } from './world/props.js';
+import { StreetLife } from './world/street-life.js';
 import { Npcs } from './world/npcs.js';
 import { DayNight } from './world/daynight.js';
 import { Encounters } from './world/encounters.js';
@@ -22,9 +24,11 @@ async function main() {
   const ctx = engine.ctx;
 
   // ---- registro de sistemas (orden = deps) ----
+  engine.register(new RenderSystem());
   engine.register(new Shibuya());          // mundo base
   engine.register(new Buildings());        // edificios (deps world)
   engine.register(new Props());            // farolas/semáforos (deps world)
+  engine.register(new StreetLife());
   engine.register(new Npcs());             // multitud (deps world)
   engine.register(new DayNight());         // ciclo día/noche (deps world)
   engine.register(new Player());           // controller FPS (deps world, buildings)
@@ -52,7 +56,8 @@ async function main() {
 
   // click en canvas → pointer lock (para jugar en primera persona)
   canvas.addEventListener('click', () => {
-    if (!ctx.input.locked && !digivice.open) ctx.input.lock();
+    const battle = ctx.peek('battle');
+    if (!ctx.input.locked && !digivice.open && !(battle && battle.running)) ctx.input.lock();
   });
 
   // Tab abre/cierra el digivice (fuera de batalla)

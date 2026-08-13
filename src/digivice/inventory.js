@@ -37,10 +37,16 @@ export class InventoryPanel {
     el.innerHTML = '';
     const list = document.createElement('div');
     list.className = 'dv-list';
+    const icons = {
+      potion: '/assets/imagine/item-cyan-vial.jpg',
+      digipan: '/assets/imagine/item-red-vial.jpg',
+      chip: '/assets/imagine/item-pistol.jpg'
+    };
     for (const [id, it] of Object.entries(this.items)) {
       const row = document.createElement('div');
       row.className = 'dv-row';
-      row.innerHTML = `<span class="dv-row-name">${it.name}</span>
+      row.innerHTML = `<img class="dv-item-icon" src="${icons[id] || '/assets/items/sheet.png'}" alt="">
+        <span class="dv-row-name">${it.name}</span>
         <span class="dv-row-count">×${it.count}</span>
         <span class="dv-row-desc">${it.desc}</span>`;
       list.appendChild(row);

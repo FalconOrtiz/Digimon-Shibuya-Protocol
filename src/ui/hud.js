@@ -30,7 +30,7 @@ export class Hud {
       <div id="hitmarker" class="hidden"></div>
       <div id="hud-top-left">
         <div class="profile-head">
-          <div id="profile-avatar">F</div>
+          <div id="profile-avatar"><img src="/assets/imagine/avatar-hood.jpg" alt=""></div>
           <div class="profile-info">
             <div id="hud-trainer-name">FalconOrtiz</div>
             <div id="profile-level">NIVEL <span id="profile-level-num">42</span></div>
@@ -42,20 +42,22 @@ export class Hud {
         </div>
       </div>
       <div id="hud-digimon">
-        <div id="hud-digimon-name"></div>
-        <div class="hud-bar"><div id="hud-dhp" class="hud-bar-fill dhp"></div></div>
-        <div id="hud-digimon-lv"></div>
-      </div>
-      <div id="hud-inventory">
-        <div class="inv-head">
-          <span>INVENTARIO</span>
-          <button id="inv-close" title="Cerrar (I)">✕</button>
+        <img id="hud-digimon-portrait" alt="" />
+        <div>
+          <div id="hud-digimon-name"></div>
+          <div class="hud-bar"><div id="hud-dhp" class="hud-bar-fill dhp"></div></div>
+          <div id="hud-digimon-lv"></div>
         </div>
-        <div id="inv-grid"></div>
       </div>
+      <div id="hud-relock" class="hidden">Clic para volver a Shibuya</div>
       <div id="hud-interact" class="hidden">[E] Interactuar</div>
       <div id="battle-ui" class="hidden">
         <div id="battle-enemy-info"></div>
+        <div id="battle-e33">
+          <div class="e33-row"><span>AP</span><div class="e33-pips" id="e33-ap"></div></div>
+          <div class="e33-row"><span>GRD</span><div class="hud-bar"><div id="e33-grd" class="hud-bar-fill st"></div></div></div>
+          <div class="e33-row"><span>BRK</span><div class="hud-bar"><div id="e33-brk" class="hud-bar-fill ehp"></div></div></div>
+        </div>
         <div id="battle-actions" class="hidden"></div>
         <div id="battle-qte" class="hidden">
           <div id="qte-label"></div>
@@ -78,8 +80,8 @@ export class Hud {
     this.hitmarkerEl = el.querySelector('#hitmarker');
     this.msgEl = el.querySelector('#hud-message');
     this.interactEl = el.querySelector('#hud-interact');
-    this.invEl = el.querySelector('#hud-inventory');
-    this.invGridEl = el.querySelector('#inv-grid');
+    this.relockEl = el.querySelector('#hud-relock');
+    this.dPortraitEl = el.querySelector('#hud-digimon-portrait');
     this.battleEl = el.querySelector('#battle-ui');
     this.enemyInfoEl = el.querySelector('#battle-enemy-info');
     this.actionsEl = el.querySelector('#battle-actions');
@@ -89,47 +91,23 @@ export class Hud {
     this.qteCursorEl = el.querySelector('#qte-cursor');
     this.qteRingEl = el.querySelector('#qte-ring');
     this.logEl = el.querySelector('#battle-log');
+    this.e33Ap = el.querySelector('#e33-ap');
+    this.e33Grd = el.querySelector('#e33-grd');
+    this.e33Brk = el.querySelector('#e33-brk');
 
     // perfil del trainer
     const trainer = this.ctx.get('trainer');
     if (trainer) {
       el.querySelector('#hud-trainer-name').textContent = trainer.name;
       el.querySelector('#profile-level-num').textContent = trainer.level;
-      el.querySelector('#profile-avatar').textContent = trainer.name.charAt(0).toUpperCase();
     }
 
-    // inventario: grid 6 slots
-    this._renderInventory();
-
-    // cerrar inventario
-    el.querySelector('#inv-close').addEventListener('click', () => {
-      this.invEl.classList.add('hidden');
-    });
+    this._updateDhp();
 
     this._qteAnimId = null;
     this._qteStart = 0;
     this._qteDuration = 1;
     this._qteType = 'crit';
-  }
-
-  _renderInventory() {
-    // 6 slots: gadgets/pociones/armas (estilo del prompt)
-    const items = [
-      { icon: '💊', name: 'Poción', cls: 'potion' },
-      { icon: '🥚', name: 'Digihuevo', cls: 'egg' },
-      { icon: '⚡', name: 'Chip', cls: 'chip' },
-      { icon: '🍞', name: 'DigiPan', cls: 'pan' },
-      { icon: '🎯', name: 'Tracker', cls: 'tracker' },
-      { icon: '📡', name: 'Digivice+', cls: 'plus' }
-    ];
-    this.invGridEl.innerHTML = '';
-    for (const it of items) {
-      const slot = document.createElement('div');
-      slot.className = 'inv-slot ' + it.cls;
-      slot.innerHTML = `<span class="inv-icon">${it.icon}</span><span class="inv-name">${it.name}</span>`;
-      slot.title = it.name;
-      this.invGridEl.appendChild(slot);
-    }
   }
 
   _wire() {
@@ -157,6 +135,7 @@ export class Hud {
       this._updateEnemyHp();
       this._updateDhp();
     });
+    ev.on('battle:e33', (p) => this._paintE33(p));
     ev.on('battle:start', (p) => this._onBattleStart(p));
     ev.on('battle:end', (p) => this._onBattleEnd(p));
     ev.on('battle:turn', (p) => this._onBattleTurn(p));
@@ -166,6 +145,12 @@ export class Hud {
     ev.on('mode', (p) => {
       this.mode = p.mode;
       if (p.mode === 'explore') this.battleEl.classList.add('hidden');
+    });
+    ev.on('digivice:close', () => {
+      if (this.relockEl) this.relockEl.classList.remove('hidden');
+    });
+    ev.on('digivice:open', () => {
+      if (this.relockEl) this.relockEl.classList.add('hidden');
     });
   }
 
@@ -180,6 +165,11 @@ export class Hud {
     this.dhpEl.style.width = `${(active.hp / active.maxHp) * 100}%`;
     this.dNameEl.textContent = active.species.name;
     this.dLvEl.textContent = `NV.${active.level}`;
+    if (this.dPortraitEl) {
+      const id = active.species.id;
+      this.dPortraitEl.src = id === 'patamon' ? '/assets/patamon-sprite.png' : '/assets/agumon-sprite.png';
+      this.dPortraitEl.style.display = 'block';
+    }
   }
 
   _updateEnemyHp() {
@@ -217,22 +207,36 @@ export class Hud {
     }
   }
 
+  _paintE33(p) {
+    if (!this.e33Ap) return;
+    const ap = p.ap ?? 0;
+    const max = p.apMax ?? 9;
+    this.e33Ap.innerHTML = Array.from({ length: max }, (_, i) =>
+      `<i class="${i < ap ? 'on' : ''}"></i>`).join('');
+    if (this.e33Grd) this.e33Grd.style.width = `${p.gradient ?? 0}%`;
+    if (this.e33Brk) this.e33Brk.style.width = `${p.break ?? 0}%`;
+  }
+
   _showActions() {
     const active = this.digimonSys.getActive();
     if (!active) return;
+    const b = this.battle;
     const moves = active.species.moves.map(id => {
       const m = this.ctx.get('digimon');
       // nombre del move
       return { id };
     });
+    const ap = b?.ap ?? 0;
+    const grd = b?.gradient ?? 0;
     this.actionsEl.innerHTML = `
-      <div class="ba-title">¿Qué hará ${active.species.name}?</div>
+      <div class="ba-title">¿Qué hará ${active.species.name}? · AP ${ap}/9 · GRD ${Math.round(grd)}%</div>
       <div class="ba-grid">
-        <button class="ba-btn" data-act="attack" data-move="${active.species.moves[0]}">⚔️ ${moveName(active.species.moves[0])}</button>
-        <button class="ba-btn" data-act="skill" data-move="${active.species.moves[1] || active.species.moves[0]}">🔥 ${moveName(active.species.moves[1] || active.species.moves[0])}</button>
-        <button class="ba-btn" data-act="item">🧪 Item</button>
-        <button class="ba-btn" data-act="digivolve">⭐ Digivolve</button>
-        <button class="ba-btn" data-act="flee">🏃 Huir</button>
+        <button class="ba-btn" data-act="attack" data-move="${active.species.moves[0]}">ATACAR · ${moveName(active.species.moves[0])} (+2 AP)</button>
+        <button class="ba-btn" data-act="skill" data-move="${active.species.moves[1] || active.species.moves[0]}" ${ap < 3 ? 'disabled' : ''}>HABILIDAD · ${moveName(active.species.moves[1] || active.species.moves[0])} (3 AP)</button>
+        <button class="ba-btn" data-act="ult" ${grd < 100 ? 'disabled' : ''}>ULT (${Math.round(grd)}%)</button>
+        <button class="ba-btn" data-act="item">ÍTEM</button>
+        <button class="ba-btn" data-act="digivolve" ${grd < 50 ? 'disabled' : ''}>DIGIEVOLUCIÓN</button>
+        <button class="ba-btn" data-act="flee">HUIR</button>
       </div>`;
     this.actionsEl.classList.remove('hidden');
     this.actionsEl.querySelectorAll('.ba-btn').forEach(btn => {
@@ -326,13 +330,7 @@ export class Hud {
     const c = document.getElementById('crosshair');
     c.style.opacity = this.mode === 'battle' ? '0' : '1';
 
-    // tecla I alterna inventario (solo en exploración)
-    if (this.mode !== 'battle') {
-      const input = this.ctx.input;
-      if (input.tapRaw('KeyI')) {
-        this.invEl.classList.toggle('hidden');
-      }
-    }
+    if (this.relockEl && this.ctx.input.locked) this.relockEl.classList.add('hidden');
   }
 
   resize() {}

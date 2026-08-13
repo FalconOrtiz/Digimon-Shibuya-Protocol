@@ -3,13 +3,15 @@
 // lean Q/E, colisiones AABB contra edificios, interacción E.
 
 import * as THREE from 'three';
+import { roundedBox } from '../fx/Sculpt';
+import { creatureSkin, makeEye } from '../fx/CreatureMaterials';
 
 export class Player {
   static id = 'player';
   static deps = ['world', 'buildings'];
 
   constructor() {
-    this.pos = new THREE.Vector3(0, 1.7, 0);   // en el CENTRO del cruce (ref: "standing in the middle")
+    this.pos = new THREE.Vector3(0, 1.7, 5);   // on the zebra, looking down -Z
     this.vel = new THREE.Vector3();
     this.yaw = 0;
     this.pitch = 0;
@@ -23,6 +25,8 @@ export class Player {
     this.height = 1.7;
     this.crouchH = 1.1;
     this._bob = 0;
+    this.viewMode = 'trainer';
+    this.followAnchor = new THREE.Vector3();
   }
 
   init(ctx) {
@@ -32,9 +36,69 @@ export class Player {
     this.buildings = ctx.get('buildings');
     this.events = ctx.events;
 
-    // campana de eventos de salud/stamina
+    this.mesh = this._buildTrainer();
+    this.mesh.visible = true;
+    ctx.scene.add(this.mesh);
+
     this.events.on('player:damage', (p) => this._applyDamage(p));
     return this;
+  }
+
+  _buildTrainer() {
+    const g = new THREE.Group();
+    const jacket = new THREE.MeshStandardMaterial({ color: 0x1c2438, roughness: 0.72, emissive: 0x0a1828, emissiveIntensity: 0.12 });
+    const skin = creatureSkin({ color: 0xe0b898, wrap: 0.45, rim: 0.22, roughness: 0.6, detail: 'none' });
+    const jeans = new THREE.MeshStandardMaterial({ color: 0x2a3348, roughness: 0.78 });
+    const hood = new THREE.MeshStandardMaterial({ color: 0x161a22, roughness: 0.82 });
+    const accent = new THREE.MeshStandardMaterial({ color: 0x4de1ff, emissive: 0x4de1ff, emissiveIntensity: 0.55 });
+    const shoeM = new THREE.MeshStandardMaterial({ color: 0x1a1a1e, roughness: 0.7 });
+
+    const hips = new THREE.Mesh(roundedBox(0.30, 0.12, 0.20, 0.04, 2), jeans);
+    hips.position.y = 0.78;
+    g.add(hips);
+    const legL = new THREE.Mesh(new THREE.CapsuleGeometry(0.052, 0.52, 4, 8), jeans);
+    legL.position.set(-0.055, 0.40, 0);
+    const legR = legL.clone();
+    legR.position.x = 0.055;
+    g.add(legL, legR);
+    const shoeL = new THREE.Mesh(roundedBox(0.11, 0.06, 0.18, 0.02, 2), shoeM);
+    shoeL.position.set(-0.055, 0.05, 0.03);
+    const shoeR = shoeL.clone();
+    shoeR.position.x = 0.055;
+    g.add(shoeL, shoeR);
+
+    const body = new THREE.Mesh(roundedBox(0.38, 0.48, 0.24, 0.07, 2), jacket);
+    body.position.y = 1.08;
+    body.castShadow = true;
+    g.add(body);
+    const armL = new THREE.Mesh(new THREE.CapsuleGeometry(0.045, 0.28, 3, 6), jacket);
+    armL.position.set(-0.22, 1.04, 0);
+    armL.rotation.z = 0.18;
+    const armR = armL.clone();
+    armR.position.x = 0.22;
+    armR.rotation.z = -0.18;
+    g.add(armL, armR);
+
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.15, 14, 12), skin);
+    head.position.y = 1.48;
+    g.add(head);
+    const eyeL = makeEye({ radius: 0.022, irisColor: 0x3a5a78 });
+    eyeL.position.set(-0.048, 1.50, 0.125);
+    const eyeR = makeEye({ radius: 0.022, irisColor: 0x3a5a78 });
+    eyeR.position.set(0.048, 1.50, 0.125);
+    g.add(eyeL, eyeR);
+    const hoodMesh = new THREE.Mesh(new THREE.SphereGeometry(0.175, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), hood);
+    hoodMesh.position.set(0, 1.55, -0.02);
+    g.add(hoodMesh);
+    const stripe = new THREE.Mesh(roundedBox(0.32, 0.045, 0.05, 0.01, 1), accent);
+    stripe.position.set(0, 1.02, 0.13);
+    g.add(stripe);
+    const vice = new THREE.Mesh(roundedBox(0.07, 0.09, 0.035, 0.01, 1), accent);
+    vice.position.set(0.20, 0.88, 0.08);
+    g.add(vice);
+
+    g.userData.parts = { legL, legR, armL, armR, shoeL, shoeR };
+    return g;
   }
 
   _applyDamage(p) {
@@ -46,9 +110,16 @@ export class Player {
   fixedUpdate(h, ctx) {
     const input = ctx.input;
     const pcfg = this.cfg.player;
+    const digivice = ctx.peek('digivice');
+    const battle = ctx.peek('battle');
+    const frozen = !!(digivice && digivice.open) || !!(battle && battle.running) || !input.locked;
+    if (!(digivice && digivice.open) && !(battle && battle.running) && input.tap('view')) {
+      this.viewMode = this.viewMode === 'fps' ? 'trainer' : 'fps';
+      if (this.mesh) this.mesh.visible = this.viewMode === 'trainer';
+    }
 
     // --- look ---
-    if (input.locked) {
+    if (input.locked && !frozen) {
       const { dx, dy } = input.consumeMouse();
       this.yaw -= dx * this.cfg.mouse.sensitivity;
       this.pitch -= dy * this.cfg.mouse.sensitivity;
@@ -57,10 +128,10 @@ export class Player {
     }
 
     // --- movimiento ---
-    const fwd = input.downKey('forward') ? 1 : 0;
-    const back = input.downKey('back') ? 1 : 0;
-    const left = input.downKey('left') ? 1 : 0;
-    const right = input.downKey('right') ? 1 : 0;
+    const fwd = (!frozen && input.downKey('forward')) ? 1 : 0;
+    const back = (!frozen && input.downKey('back')) ? 1 : 0;
+    const left = (!frozen && input.downKey('left')) ? 1 : 0;
+    const right = (!frozen && input.downKey('right')) ? 1 : 0;
 
     const sprintWanted = input.downKey('sprint') && this.stamina > 0;
     this.crouching = input.downKey('crouch');
@@ -95,7 +166,7 @@ export class Player {
     // gravedad y salto (en batalla el Space pertenece al QTE — no consumir el tap)
     this.vel.y -= 16 * h;
     const inBattle = this.ctx.get('battle')?.running;
-    if (!inBattle && input.tap('jump') && this.onGround) {
+    if (!inBattle && !frozen && input.tap('jump') && this.onGround) {
       this.vel.y = pcfg.jumpVel;
       this.onGround = false;
     }
@@ -135,7 +206,7 @@ export class Player {
     }
 
     // interacción
-    if (input.tap('interact')) {
+    if (!frozen && input.tap('interact')) {
       this.events.emit('interact', { from: this.pos.clone() });
     }
 
@@ -149,7 +220,6 @@ export class Player {
   }
 
   lateUpdate(dt, ctx) {
-    // posición de cámara: ojos + bob + lean lateral
     const eye = this.crouching ? this.crouchH : this.height;
     const bobY = this.onGround && Math.abs(this.vel.x) + Math.abs(this.vel.z) > 1
       ? Math.sin(this._bob * 2) * 0.045
@@ -158,15 +228,55 @@ export class Player {
       ? Math.cos(this._bob) * 0.03
       : 0;
 
-    ctx.camera.position.set(
-      this.pos.x + bobX + this.lean * 0.25,
-      this.pos.y + bobY,
-      this.pos.z
+    const feetY = this.pos.y - this.height;
+    if (this.mesh) {
+      this.mesh.position.set(this.pos.x, feetY, this.pos.z);
+      this.mesh.rotation.y = this.yaw;
+      const parts = this.mesh.userData.parts;
+      const moving = Math.abs(this.vel.x) + Math.abs(this.vel.z) > 0.4;
+      if (parts) {
+        const swing = moving ? Math.sin(this._bob * 2) * 0.28 : 0;
+        parts.legL.rotation.x = swing;
+        parts.legR.rotation.x = -swing;
+        parts.armL.rotation.x = -swing;
+        parts.armR.rotation.x = swing;
+        const lift = moving ? Math.max(0, -Math.sin(this._bob * 2)) * 0.04 : 0;
+        const liftR = moving ? Math.max(0, Math.sin(this._bob * 2)) * 0.04 : 0;
+        parts.shoeL.position.y = 0.05 + lift;
+        parts.shoeR.position.y = 0.05 + liftR;
+      }
+    }
+
+    const right = this.yaw + Math.PI / 2;
+    this.followAnchor.set(
+      this.pos.x + Math.sin(right) * 1.35 - Math.sin(this.yaw) * 1.6,
+      feetY,
+      this.pos.z + Math.cos(right) * 1.35 - Math.cos(this.yaw) * 1.6
     );
+
     ctx.camera.rotation.order = 'YXZ';
-    ctx.camera.rotation.y = this.yaw;
-    ctx.camera.rotation.x = this.pitch;
-    ctx.camera.rotation.z = this.lean * 0.06;
+    if (this.viewMode === 'trainer') {
+      const back = 2.6, up = 1.5, side = 0.45;
+      ctx.camera.position.set(
+        this.pos.x + Math.sin(this.yaw) * back + Math.sin(right) * side,
+        feetY + up + bobY,
+        this.pos.z + Math.cos(this.yaw) * back + Math.cos(right) * side
+      );
+      ctx.camera.lookAt(
+        this.pos.x - Math.sin(this.yaw) * 7,
+        feetY + 0.7,
+        this.pos.z - Math.cos(this.yaw) * 7
+      );
+    } else {
+      ctx.camera.position.set(
+        this.pos.x + bobX + this.lean * 0.25,
+        this.pos.y + bobY,
+        this.pos.z
+      );
+      ctx.camera.rotation.y = this.yaw;
+      ctx.camera.rotation.x = this.pitch;
+      ctx.camera.rotation.z = this.lean * 0.06;
+    }
 
     // FOV kick al sprint
     const targetFov = this.sprinting ? this.cfg.mouse.fovSprint : this.cfg.mouse.fov;
@@ -177,5 +287,7 @@ export class Player {
   }
 
   resize() {}
-  dispose() {}
+  dispose() {
+    if (this.mesh && this.mesh.parent) this.mesh.parent.remove(this.mesh);
+  }
 }

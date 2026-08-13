@@ -25,7 +25,7 @@ export const QUALITY_PRESETS = {
     particleBudget: 600,
     decalBudget: 128,
     npcCount: 40,
-    far: 350
+    far: 650
   },
   high: {
     label: 'Alta',
@@ -37,8 +37,8 @@ export const QUALITY_PRESETS = {
     volumetric: true,
     particleBudget: 1200,
     decalBudget: 256,
-    npcCount: 70,
-    far: 500
+    npcCount: 110,
+    far: 800
   }
 };
 
@@ -58,7 +58,8 @@ export const KEYBINDS = {
   skill2: 'Digit2',
   skill3: 'Digit3',
   skill4: 'Digit4',
-  pause: 'Escape'
+  pause: 'Escape',
+  view: 'KeyV'
 };
 
 export const DIGIMON_STATS = {
@@ -95,7 +96,7 @@ export function defaultConfig() {
       arenaRadius: 18
     },
     world: {
-      startHour: 18.5,      // atardecer dorado→violeta (ref FPS: cielo #f0d8a8 en horizonte)
+      startHour: 18.5,      // hora azul Paulius / ART_DIRECTION
       daySpeed: 0.02,       // horas por segundo real
       spawnRadius: 60
     },

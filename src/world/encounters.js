@@ -41,7 +41,7 @@ export class Encounters {
 
     // posición aleatoria en el cruce o calles
     const a = this.rng.float() * Math.PI * 2;
-    const r = 8 + this.rng.float() * 26;
+    const r = 18 + this.rng.float() * 22;
     const x = Math.cos(a) * r, z = Math.sin(a) * r;
     model.position.set(x, 0, z);
     this.root.add(model);

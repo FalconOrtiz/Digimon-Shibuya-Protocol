@@ -10,6 +10,7 @@
 // la batalla emite eventos para que el HUD y la presentación se actualicen.
 
 import { QteSystem, qteCritResult } from './qte.js';
+import { BattleArena } from './arena.js';
 import { damageForMove, getMove } from '../core/digimon-moves.js';
 import { getSpecies, EXTRA_MOVES } from '../core/digimon-data.js';
 
@@ -43,6 +44,7 @@ export class Battle {
     this.digimonSys = ctx.get('digimon');
     this.playerSys = ctx.get('player');
     this.qte = new QteSystem(ctx);
+    this.arena = new BattleArena(ctx.scene);
 
     // escuchar inputs de acción (espacio = confirmar / QTE)
     ctx.input; // input se consulta en update()
@@ -59,22 +61,34 @@ export class Battle {
     this.running = true;
     this.enemy = this._makeEnemy(p);
     this.playerDigimon = this.digimonSys.getActive();
+    this.ap = 3;
+    this.apMax = 9;
+    this.gradient = 0;
+    this.breakMeter = 0;
+    this.brokenTurns = 0;
     this.round = 1;
     this.result = null;
     this.phase = PHASE.INTRO;
 
-    // MODO BATALLA: liberar el mouse para poder seleccionar opciones con clic
+    // MODO BATALLA: liberar el mouse para poder seleccionar opciones con clic.
+    // Digivice must NOT treat this unlock as a pause-menu request.
+    const dv = this.ctx.peek('digivice');
+    if (dv) dv._ignoreUnlock = true;
     if (document.pointerLockElement) document.exitPointerLock();
     this._wasLocked = true;
+    if (dv && dv.open) dv.close();
 
     this.events.emit('battle:start', {
       enemy: this.enemy.species.name,
       trainer: p.trainerName || null,
-      rival: !!p.rival
+      rival: !!p.rival,
+      ap: this.ap, apMax: this.apMax, gradient: this.gradient, break: this.breakMeter
     });
+    this._emitE33();
 
     // pausa de exploración
     this.events.emit('mode', { mode: 'battle' });
+    if (this.arena) this.arena.show();
 
     this._after(900, () => {
       this._beginPlayerTurn();
@@ -96,9 +110,21 @@ export class Battle {
     };
   }
 
+  _emitE33() {
+    this.events.emit('battle:e33', {
+      ap: this.ap, apMax: this.apMax, gradient: this.gradient, break: this.breakMeter, broken: this.brokenTurns
+    });
+  }
+
   _beginPlayerTurn() {
     this.phase = PHASE.PLAYER_TURN;
-    this.events.emit('battle:turn', { actor: 'player', digimon: this.playerDigimon.species.name, phase: this.phase });
+    this._emitE33();
+    this.events.emit('battle:turn', {
+      actor: 'player',
+      digimon: this.playerDigimon.species.name,
+      phase: this.phase,
+      ap: this.ap, gradient: this.gradient, break: this.breakMeter
+    });
   }
 
   // el jugador elige una acción desde el HUD/Digivice
@@ -107,27 +133,47 @@ export class Battle {
     if (this.phase !== PHASE.PLAYER_TURN) return;
 
     switch (p.action) {
-      case 'attack':
+      case 'attack': {
+        this._playerAttack(p.move || this.playerDigimon.species.moves[0], { basic: true });
+        break;
+      }
       case 'skill': {
-        const moveId = p.move || this.playerDigimon.species.moves[0];
-        this._playerAttack(moveId);
+        if (this.ap < 3) {
+          this.events.emit('battle:message', { text: 'No hay AP suficiente (cuesta 3).' });
+          return;
+        }
+        this.ap -= 3;
+        this.gradient = Math.min(100, this.gradient + 15);
+        this._playerAttack(p.move || this.playerDigimon.species.moves[1] || this.playerDigimon.species.moves[0], { basic: false });
+        break;
+      }
+      case 'ult': {
+        if (this.gradient < 100) {
+          this.events.emit('battle:message', { text: 'Gradient incompleto.' });
+          return;
+        }
+        this.gradient = 0;
+        this._playerAttack(this.playerDigimon.species.moves[0], { ult: true });
         break;
       }
       case 'item':
-        // ítem: curar 30 HP (por ahora hardcodeado; inventario en Fase 6)
         this._useItem();
         break;
       case 'flee':
         this._flee();
         break;
       case 'digivolve':
-        this.events.emit('battle:qte', { type: 'info', state: 'end', result: 'no-digivolve-yet' });
+        if (this.gradient < 50) {
+          this.events.emit('digivice:message', { text: 'Necesitas 50% Gradient para digievolucionar.' });
+          return;
+        }
         this.events.emit('digivice:message', { text: '¡Aún no tienes el poder de digievolucionar!' });
         break;
     }
   }
 
-  _playerAttack(moveId) {
+  _playerAttack(moveId, flags = {}) {
+    this._atkFlags = flags;
     this.phase = PHASE.PLAYER_QTE;
     const move = getMove(moveId);
     this.events.emit('battle:turn', { actor: 'player', action: move.name, phase: this.phase });
@@ -153,13 +199,27 @@ export class Battle {
       return;
     }
 
-    const dmg = damageForMove(
+    let dmg = damageForMove(
       moveId,
       { element: this.playerDigimon.species.element, atk: this.playerDigimon.species.atk },
       { element: this.enemy.species.element, def: this.enemy.species.def },
       qteResult === 'crit' ? 'crit' : 'hit',
       this.playerDigimon.level
     );
+    if (this._atkFlags?.ult) dmg = Math.floor(dmg * 2.5);
+    if (this._atkFlags?.basic) {
+      this.ap = Math.min(this.apMax, this.ap + 2);
+      this.breakMeter = Math.min(100, this.breakMeter + 8);
+    } else {
+      this.breakMeter = Math.min(100, this.breakMeter + 14);
+    }
+    if (this.breakMeter >= 100) {
+      this.brokenTurns = 2;
+      this.breakMeter = 0;
+      dmg = Math.floor(dmg * 1.5);
+      this.events.emit('battle:message', { text: '¡DATA BREAK! El enemigo queda aturdido.' });
+    }
+    this._emitE33();
 
     this.enemy.hp = Math.max(0, this.enemy.hp - dmg);
 
@@ -197,6 +257,12 @@ export class Battle {
   }
 
   _beginEnemyTurn() {
+    if (this.brokenTurns > 0) {
+      this.brokenTurns--;
+      this.events.emit('battle:message', { text: 'El enemigo está aturdido…' });
+      this._after(700, () => this._beginPlayerTurn());
+      return;
+    }
     this.phase = PHASE.ENEMY_TURN;
     const moveId = this.ctx.rng.pick(this.enemy.moves);
     const move = getMove(moveId);
@@ -278,6 +344,7 @@ export class Battle {
     this.running = false;
     this.events.emit('battle:end', { result });
     this.events.emit('mode', { mode: 'explore' });
+    if (this.arena) this.arena.hide();
 
     // volver a bloquear el mouse para explorar en primera persona
     if (this._wasLocked) {
@@ -309,9 +376,13 @@ export class Battle {
   }
 
   update() {
+    const input = this.ctx.input;
+    if (this.running && this.phase === PHASE.PLAYER_TURN && input.tap('pause')) {
+      this.events.emit('battle:message', { text: 'Pulsa HUIR para salir de la batalla.' });
+      return;
+    }
     // input del QTE: cuando hay QTE activo, espacio o clic izquierdo dispara
     if (this.qte && this.qte.isActive()) {
-      const input = this.ctx.input;
       const pressed = input.tap('jump') || (input.down('Mouse0') && !this._lastMouse);
       this._lastMouse = input.down('Mouse0');
       if (pressed) {
@@ -327,5 +398,6 @@ export class Battle {
   dispose() {
     for (const t of this._timeouts) clearTimeout(t);
     this._timeouts = [];
+    if (this.arena) this.arena.dispose();
   }
 }
