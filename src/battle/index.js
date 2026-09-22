@@ -11,8 +11,8 @@
 
 import { QteSystem, qteCritResult } from './qte.js';
 import { BattleArena } from './arena.js';
-import { damageForMove, getMove } from '../core/digimon-moves.js';
-import { getSpecies, EXTRA_MOVES } from '../core/digimon-data.js';
+import { damageForMove, getMove } from '../core/DigimonMoves';
+import { getSpecies, EXTRA_MOVES } from '../core/DigimonData';
 
 const PHASE = {
   INTRO: 'intro',

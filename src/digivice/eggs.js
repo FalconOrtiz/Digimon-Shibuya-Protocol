@@ -2,7 +2,7 @@
 // Huevos encontrados en el mundo; incuban con el tiempo jugado. Al eclosionar
 // → evento egg:hatch y el digimon se une al equipo.
 
-import { getSpecies } from '../core/digimon-data.js';
+import { getSpecies } from '../core/DigimonData';
 
 export const EGG_OPTIONS = ['koromon', 'nyaromon', 'bukamon'];
 

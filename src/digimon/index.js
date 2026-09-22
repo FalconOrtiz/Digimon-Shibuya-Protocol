@@ -5,8 +5,7 @@
 import * as THREE from 'three';
 import { buildDigimon } from './models.js';
 import { DigimonAnimator } from './anim.js';
-import { getSpecies } from '../core/digimon-data.js';
-import { MOVES } from '../core/config.js';
+import { getSpecies } from '../core/DigimonData';
 import { disposeSprite } from './sprites.js';
 
 export class DigimonSystem {

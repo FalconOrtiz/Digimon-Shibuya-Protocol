@@ -1,20 +1,25 @@
 {
   "name": "digimon-shibuya-protocol",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173",
-    "shot": "node tools/capture.mjs"
+    "check": "tsc --noEmit",
+    "test": "node --experimental-strip-types --no-warnings --import ./tests/ts-resolver.mjs --test tests/*.test.mjs",
+    "shot": "node tools/capture.mjs",
+    "gate": "node tools/visual-gate.mjs"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.185.1"
   },
   "devDependencies": {
+    "@types/three": "^0.185.1",
     "playwright": "^1.61.1",
     "pngjs": "^7.0.0",
+    "typescript": "^5.9.3",
     "vite": "^7.3.6"
   }
 }
