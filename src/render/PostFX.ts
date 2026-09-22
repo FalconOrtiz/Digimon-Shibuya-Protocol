@@ -101,7 +101,7 @@ class GBufferPass extends Pass {
     // for its own prepass and the AO result depends on that.
     this.scene.traverse((o) => {
       const any = o as THREE.Object3D & { isPoints?: boolean; isLine?: boolean };
-      if ((any.isPoints || any.isLine) && o.visible) {
+      if ((any.isPoints || any.isLine || o.userData.noAO) && o.visible) {
         o.visible = false;
         this.hidden.push(o);
       }
@@ -141,7 +141,7 @@ class GBufferPass extends Pass {
  *   Render (HDR, MSAA)
  *     -> GTAO          contact shadows in creases and under foliage
  *     -> Bloom         HDR highlight bleed
- *     -> Grade         DOF-lite + ACES + film curve + vignette + grain + CA
+ *     -> Grade         DOF-lite + ACES + film curve + vignette + grain
  *     -> SMAA          edge antialias on the final LDR image
  */
 
@@ -154,7 +154,6 @@ export interface GradeSettings {
   gainHighlight: THREE.Color;
   vignette: number;
   grain: number;
-  chromatic: number;
   /** Distance in metres where the far blur reaches full strength. */
   dofFar: number;
   dofStrength: number;
@@ -210,7 +209,6 @@ const GradeShader = {
     uGain: { value: new THREE.Color(1.03, 1.005, 0.96) },
     uVignette: { value: 0.34 },
     uGrain: { value: 0.018 },
-    uChromatic: { value: 0.0016 },
     uTime: { value: 0 },
     uDofFar: { value: 55.0 },
     uDofStrength: { value: 1.0 },
@@ -238,7 +236,6 @@ const GradeShader = {
     uniform vec3  uGain;
     uniform float uVignette;
     uniform float uGrain;
-    uniform float uChromatic;
     uniform float uTime;
     uniform float uDofFar;
     uniform float uDofStrength;
@@ -283,16 +280,24 @@ const GradeShader = {
              (uCameraFar + uCameraNear - ndc * (uCameraFar - uCameraNear));
     }
 
-    // Golden-angle spiral: 12 taps read as a smooth circular bokeh without
-    // the ring artefacts a fixed-ring kernel produces at this tap count.
-    const int DOF_TAPS = 12;
+    float hash12(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+
+    // Golden-angle spiral rotated per pixel: a fixed kernel stamps each tap as
+    // a visible ghost copy of far silhouettes; the rotation turns that into
+    // fine noise that reads as blur.
+    const int DOF_TAPS = 16;
     vec3 depthOfField(vec2 uv, float coc) {
       vec3 sum = vec3(0.0);
       float total = 0.0;
-      float radius = coc * 0.012;
+      float radius = coc * 0.005;
+      float spin = hash12(gl_FragCoord.xy) * 6.2831853;
       for (int i = 0; i < DOF_TAPS; i++) {
-        float fi = float(i);
-        float ang = fi * 2.39996323;
+        float fi = float(i) + 0.5;
+        float ang = fi * 2.39996323 + spin;
         float r = sqrt(fi / float(DOF_TAPS)) * radius;
         vec2 off = vec2(cos(ang), sin(ang)) * r;
         off.x *= uResolution.y / uResolution.x;
@@ -303,13 +308,6 @@ const GradeShader = {
         total += w;
       }
       return sum / max(total, 0.0001);
-    }
-
-    // Hash-based blue-ish noise for grain and dither.
-    float hash12(vec2 p) {
-      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-      p3 += dot(p3, p3.yzx + 33.33);
-      return fract((p3.x + p3.y) * p3.z);
     }
 
     void main() {
@@ -328,17 +326,6 @@ const GradeShader = {
         color = coc > 0.01 ? depthOfField(uv, coc) : texture2D(tDiffuse, uv).rgb;
       } else {
         color = texture2D(tDiffuse, uv).rgb;
-      }
-
-      // ---- Chromatic aberration ---------------------------------------
-      // Scaled by r^2 so the centre of frame stays perfectly clean.
-      if (uChromatic > 0.0) {
-        float amt = uChromatic * r2 * 4.0;
-        vec2 dir = normalize(centered + 1e-6);
-        float rr = texture2D(tDiffuse, uv - dir * amt).r;
-        float bb = texture2D(tDiffuse, uv + dir * amt).b;
-        color.r = mix(color.r, rr, 0.85);
-        color.b = mix(color.b, bb, 0.85);
       }
 
       // ---- Exposure and tone map --------------------------------------
@@ -419,9 +406,8 @@ export class PostFX {
     gainHighlight: new THREE.Color(1.06, 0.97, 0.88),
     vignette: 0.35,
     grain: 0.018,
-    chromatic: 0.0005,
-    dofFar: 58,
-    dofStrength: 1.0,
+    dofFar: 120,
+    dofStrength: 0.8,
   };
 
   constructor(renderer: THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, quality: QualityTier) {
@@ -556,7 +542,6 @@ export class PostFX {
     u.uGain.value.copy(s.gainHighlight);
     u.uVignette.value = s.vignette;
     u.uGrain.value = s.grain;
-    u.uChromatic.value = s.chromatic;
     u.uDofFar.value = s.dofFar;
     u.uDofStrength.value = s.dofStrength;
   }

@@ -1112,9 +1112,10 @@ export function ledScreenTexture(opts: LedScreenOptions): LedScreen {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.generateMipmaps = false;
-  texture.minFilter = THREE.LinearFilter;
-  texture.anisotropy = 4;
+  // Mipmaps keep the 4px LED grid from aliasing into moiré on distant screens.
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.anisotropy = 8;
 
   const phase = (seed % 97) / 97;
   const update = (t: number) => {

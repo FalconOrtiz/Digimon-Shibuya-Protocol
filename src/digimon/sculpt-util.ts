@@ -222,6 +222,31 @@ function smoothAttr(geo: THREE.BufferGeometry, name: string, iters: number): voi
 }
 
 /* ------------------------------------------------------------------ */
+/* Surface probing                                                     */
+/* ------------------------------------------------------------------ */
+
+export interface SurfaceHit {
+  point: THREE.Vector3;
+  normal: THREE.Vector3;
+}
+
+/**
+ * Casts from `origin` along `dir` and returns the outermost hit on a sculpt,
+ * so decals (eyes, mouth, nostrils) sit on the surface whatever the balls do.
+ */
+export function makeSurfaceProbe(geo: THREE.BufferGeometry): (origin: THREE.Vector3, dir: THREE.Vector3) => SurfaceHit | null {
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  const ray = new THREE.Raycaster();
+  return (origin, dir) => {
+    ray.set(origin, dir.clone().normalize());
+    const hits = ray.intersectObject(mesh, false);
+    const h = hits[hits.length - 1];
+    if (!h?.face) return null;
+    return { point: h.point.clone(), normal: h.face.normal.clone() };
+  };
+}
+
+/* ------------------------------------------------------------------ */
 /* Claws                                                               */
 /* ------------------------------------------------------------------ */
 

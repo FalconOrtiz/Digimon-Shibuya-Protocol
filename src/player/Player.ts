@@ -1,6 +1,10 @@
 import * as THREE from 'three';
 import { roundedBox } from '../fx/Sculpt';
-import { creatureSkin, makeEye } from '../fx/materials/CreatureMaterials';
+import { creatureSkin } from '../fx/materials/CreatureMaterials';
+import {
+  CHIBI, armGeometry, bagGeometry, chibiPartMatrix, chibiPose, faceGeometry, hairGeometry, handGeometry, headGeometry,
+  hipsGeometry, legGeometry, shoeGeometry, torsoGeometry, type ChibiPose, type ChibiSlot,
+} from '../fx/Chibi';
 import { glowMaterial } from '../fx/materials/PropMaterials';
 import { groundHeightAt } from '../core/Layout';
 import type { Ctx, GameSystem } from '../core/Context';
@@ -17,14 +21,7 @@ interface Collide {
   collide(pos: { x: number; z: number }, radius: number): { hit: boolean; nx?: number; nz?: number };
 }
 
-interface TrainerParts {
-  legL: THREE.Object3D;
-  legR: THREE.Object3D;
-  armL: THREE.Object3D;
-  armR: THREE.Object3D;
-  shoeL: THREE.Object3D;
-  shoeR: THREE.Object3D;
-}
+const TRAINER_SCALE = 1.1;
 
 export class Player implements GameSystem {
   static id = 'player';
@@ -52,6 +49,8 @@ export class Player implements GameSystem {
   private cfg!: GameConfig;
   private buildings!: Collide;
   private bob = 0;
+  private stride = 0;
+  private readonly pose: ChibiPose = { bob: 0, leg: 0, arm: 0, tilt: 0 };
 
   init(ctx: Ctx): this {
     this.ctx = ctx;
@@ -179,14 +178,8 @@ export class Player implements GameSystem {
     this.mesh.position.set(this.pos.x, feetY, this.pos.z);
     // El modelo mira a +Z; el trainer camina hacia -Z (forward de cámara).
     this.mesh.rotation.y = this.yaw + Math.PI;
-    const parts = this.mesh.userData.parts as TrainerParts;
-    const swing = moving > 0.4 ? Math.sin(this.bob * 2) * 0.28 : 0;
-    parts.legL.rotation.x = swing;
-    parts.legR.rotation.x = -swing;
-    parts.armL.rotation.x = -swing;
-    parts.armR.rotation.x = swing;
-    parts.shoeL.position.y = 0.05 + (moving > 0.4 ? Math.max(0, -Math.sin(this.bob * 2)) * 0.04 : 0);
-    parts.shoeR.position.y = 0.05 + (moving > 0.4 ? Math.max(0, Math.sin(this.bob * 2)) * 0.04 : 0);
+    this.stride += ((moving > 0.4 && this.onGround ? 1 : 0) - this.stride) * Math.min(1, dt * 10);
+    poseTrainer(this.mesh, chibiPose(this.bob * 2, this.stride, this.pose));
 
     const right = this.yaw + Math.PI / 2;
     this.followAnchor.set(
@@ -224,49 +217,71 @@ export class Player implements GameSystem {
   }
 }
 
+/** The trainer is a crowd chibi in the avatar's outfit: navy hood up, cyan trims, backpack. */
 function buildTrainer(): THREE.Group {
   const g = new THREE.Group();
   g.name = 'Trainer';
-  const cloth = (color: number, roughness: number) => creatureSkin({ color, wrap: 0.35, rim: 0.18, roughness, detail: 'none' });
-  const jacket = cloth(0x1c2438, 0.72);
-  const jeans = cloth(0x2a3348, 0.8);
-  const hood = cloth(0x161a22, 0.85);
-  const shoe = cloth(0x1a1a1e, 0.6);
-  const skin = creatureSkin({ color: 0xe0b898, wrap: 0.45, rim: 0.22, roughness: 0.6, detail: 'none' });
-  const accent = glowMaterial('trainer.accent', 0x4de1ff, 1.2, 3.2);
-
-  const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number) => {
-    const m = new THREE.Mesh(geo, mat);
-    m.position.set(x, y, z);
-    m.castShadow = true;
-    g.add(m);
+  g.scale.setScalar(TRAINER_SCALE);
+  const cloth = (color: number, roughness: number) => {
+    const m = new THREE.MeshStandardMaterial({ color, roughness, metalness: 0, vertexColors: true });
+    m.name = `trainer.cloth.${color.toString(16)}`;
     return m;
   };
+  const hoodie = cloth(0x2e3f8a, 0.78);
+  const jeans = cloth(0x262c40, 0.82);
+  const sneakers = cloth(0xf2f2f4, 0.6);
+  const pack = cloth(0x1e2438, 0.7);
+  const hood = cloth(0xffffff, 0.8);
+  const skin = creatureSkin({ color: 0xf0cdb0, wrap: 0.45, rim: 0.22, roughness: 0.6, detail: 'none' });
+  skin.vertexColors = true;
+  const face = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0, vertexColors: true });
+  const accent = glowMaterial('trainer.accent', 0x4de1ff, 1.2, 3.2);
 
-  add(roundedBox(0.3, 0.12, 0.2, 0.04, 2), jeans, 0, 0.78, 0);
-  const legGeo = new THREE.CapsuleGeometry(0.052, 0.52, 4, 8);
-  const legL = add(legGeo, jeans, -0.055, 0.4, 0);
-  const legR = add(legGeo, jeans, 0.055, 0.4, 0);
-  const shoeGeo = roundedBox(0.11, 0.06, 0.18, 0.02, 2);
-  const shoeL = add(shoeGeo, shoe, -0.055, 0.05, 0.03);
-  const shoeR = add(shoeGeo, shoe, 0.055, 0.05, 0.03);
-  add(roundedBox(0.38, 0.48, 0.24, 0.07, 2), jacket, 0, 1.08, 0);
-  const armGeo = new THREE.CapsuleGeometry(0.045, 0.28, 3, 6);
-  const armL = add(armGeo, jacket, -0.22, 1.04, 0);
-  armL.rotation.z = 0.18;
-  const armR = add(armGeo, jacket, 0.22, 1.04, 0);
-  armR.rotation.z = -0.18;
-  add(new THREE.SphereGeometry(0.15, 18, 14), skin, 0, 1.48, 0);
-  for (const x of [-0.048, 0.048]) {
-    const eye = makeEye({ radius: 0.022, irisColor: 0x3a5a78 });
-    eye.position.set(x, 1.5, 0.125);
-    g.add(eye);
+  const slots = {} as Record<ChibiSlot, THREE.Mesh>;
+  const part = (slot: ChibiSlot, geo: THREE.BufferGeometry, mat: THREE.Material, shadow = true) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.matrixAutoUpdate = false;
+    m.castShadow = shadow;
+    m.receiveShadow = true;
+    g.add(m);
+    slots[slot] = m;
+    return m;
+  };
+  const torso = part('torso', torsoGeometry('hoodie'), hoodie);
+  part('hips', hipsGeometry(), jeans);
+  part('head', headGeometry(), skin);
+  part('face', faceGeometry(), face, false);
+  part('hair', hairGeometry('hood'), hood);
+  const bag = part('bag', bagGeometry(), pack);
+  for (const s of ['L', 'R'] as const) {
+    part(`leg${s}`, legGeometry(), jeans);
+    part(`shoe${s}`, shoeGeometry(), sneakers);
+    part(`arm${s}`, armGeometry(), hoodie);
+    part(`hand${s}`, handGeometry(), skin, false);
   }
-  add(new THREE.SphereGeometry(0.175, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6), hood, 0, 1.55, -0.02);
-  add(roundedBox(0.32, 0.045, 0.05, 0.01, 1), accent, 0, 1.02, 0.13).castShadow = false;
-  add(roundedBox(0.07, 0.09, 0.035, 0.01, 1), accent, 0.2, 0.88, 0.08).castShadow = false;
 
-  g.userData.parts = { legL, legR, armL, armR, shoeL, shoeR } satisfies TrainerParts;
-  g.userData.height = 1.7;
+  const trim = (w: number, h: number, d: number, x: number, y: number, z: number, parent: THREE.Object3D, rz = 0) => {
+    const m = new THREE.Mesh(roundedBox(w, h, d, Math.min(w, h, d) * 0.45, 1), accent);
+    m.position.set(x, y, z);
+    m.rotation.z = rz;
+    parent.add(m);
+  };
+  const H = CHIBI.SHOULDER - CHIBI.HIP;
+  trim(0.016, H * 0.8, 0.012, 0, H * 0.46, 0.142, torso);
+  trim(0.06, 0.05, 0.012, 0.075, H * 0.7, 0.13, torso);
+  for (const s of [-1, 1]) trim(0.028, H * 0.95, 0.012, s * 0.1, H * 0.5, 0.125, torso, s * 0.08);
+  trim(0.16, 0.022, 0.012, 0, 0.02, 0.075, bag);
+
+  g.userData.parts = slots;
+  g.userData.height = CHIBI.HEAD_Y + CHIBI.HEAD_R;
+  poseTrainer(g, chibiPose(0, 0));
   return g;
+}
+
+function poseTrainer(g: THREE.Group, pose: ChibiPose): void {
+  const slots = g.userData.parts as Record<ChibiSlot, THREE.Mesh>;
+  for (const [slot, mesh] of Object.entries(slots) as [ChibiSlot, THREE.Mesh][]) {
+    chibiPartMatrix(slot, pose, mesh.matrix);
+    mesh.matrixWorldNeedsUpdate = true;
+  }
 }

@@ -45,6 +45,7 @@ export class RenderSystem implements GameSystem {
   draw(dt: number): void {
     const nf = (this.ctx.scene.userData.nightFactor as number | undefined) ?? 0;
     this.fx.setLook(nf);
+    this.fx.settings.dofStrength = this.pose ? 0 : 0.8;
     if (this.pose) {
       const cam = this.ctx.camera;
       cam.position.copy(this.pose.position);

@@ -35,14 +35,27 @@ interface MenuState {
   aim?: { usable: boolean };
 }
 
+interface WindowZone {
+  type: string;
+  label: string;
+  from: number;
+  to: number;
+  perfect?: number;
+}
+
 interface WindowState {
   state: 'incoming' | 'open' | 'follow-up' | 'closed';
   lead?: number;
+  span?: number;
   duration?: number;
+  timeScale?: number;
   hitType?: string;
   keys?: { key: string; label: string }[];
+  zones?: WindowZone[];
   result?: string;
   label?: string;
+  grade?: 'perfect' | 'good' | 'miss';
+  pressedAt?: number | null;
 }
 
 interface PartyLike {
@@ -66,7 +79,9 @@ export class Hud implements GameSystem {
   private bannerTimer = 0;
   private hitTimer = 0;
   private resultTimer = 0;
-  private ringAnim: Animation | null = null;
+  private sweep: Animation[] = [];
+  /** Timing bar layout of the current hit: seconds before and after the hit frame. */
+  private bar = { lead: 0.32, span: 0.5 };
   private cursor = { x: 0.5, y: 0.5 };
 
   init(ctx: Ctx): this {
@@ -91,12 +106,12 @@ export class Hud implements GameSystem {
           <div id="profile-avatar"><img src="/assets/imagine/avatar-hood.jpg" alt=""></div>
           <div class="profile-info">
             <div id="hud-trainer-name">${esc(trainer.name)}</div>
-            <div id="profile-level">NIVEL <span id="profile-level-num">${trainer.level}</span></div>
+            <div id="profile-level">LEVEL <span id="profile-level-num">${trainer.level}</span></div>
           </div>
         </div>
         <div id="hud-bars">
-          <div class="hud-bar-row"><span class="hud-bar-label">VIDA</span><div class="hud-bar"><div id="hud-hp" class="hud-bar-fill hp"></div></div><span class="hud-bar-num" id="hud-hp-num">100/100</span></div>
-          <div class="hud-bar-row"><span class="hud-bar-label">ENERGIA</span><div class="hud-bar"><div id="hud-stamina" class="hud-bar-fill st"></div></div><span class="hud-bar-num" id="hud-st-num">100/100</span></div>
+          <div class="hud-bar-row"><span class="hud-bar-label">HEALTH</span><div class="hud-bar"><div id="hud-hp" class="hud-bar-fill hp"></div></div><span class="hud-bar-num" id="hud-hp-num">100/100</span></div>
+          <div class="hud-bar-row"><span class="hud-bar-label">ENERGY</span><div class="hud-bar"><div id="hud-stamina" class="hud-bar-fill st"></div></div><span class="hud-bar-num" id="hud-st-num">100/100</span></div>
         </div>
       </div>
       <div id="hud-digimon">
@@ -107,14 +122,19 @@ export class Hud implements GameSystem {
           <div id="hud-digimon-lv"></div>
         </div>
       </div>
-      <div id="hud-relock" class="hidden">Clic para volver a Shibuya</div>
+      <div id="hud-relock" class="hidden">Click to return to Shibuya</div>
       <div id="hud-message" class="hidden"></div>
       <div id="battle-ui" class="hidden">
         <div id="bt-foe" class="bt-card"></div>
         <div id="bt-ally" class="bt-card"></div>
         <div id="bt-banner" class="hidden"></div>
         <div id="bt-menu" class="hidden"></div>
-        <div id="bt-defend" class="hidden"><div id="bt-ring"></div><div class="bt-keys" id="bt-keys"></div><div id="bt-result"></div></div>
+        <div id="bt-defend" class="hidden">
+          <div id="bt-prompt"></div>
+          <div id="bt-track"><div id="bt-fill"></div><div id="bt-lanes"></div><div id="bt-impact"></div><div id="bt-cursor"></div><div id="bt-press"></div></div>
+          <div class="bt-keys" id="bt-keys"></div>
+          <div id="bt-result"></div>
+        </div>
         <div id="bt-aim-catch" class="hidden"></div>
         <div id="bt-reticle" class="hidden"></div>
       </div>
@@ -185,7 +205,7 @@ export class Hud implements GameSystem {
     if (!a) return;
     this.el['hud-dhp'].style.width = `${(a.hp / Math.max(1, a.maxHp)) * 100}%`;
     this.el['hud-digimon-name'].textContent = a.species.name;
-    this.el['hud-digimon-lv'].textContent = `NV.${a.level}`;
+    this.el['hud-digimon-lv'].textContent = `LV.${a.level}`;
     const img = this.el['hud-digimon-portrait'] as HTMLImageElement;
     const src = PORTRAIT[a.baseSpecies];
     img.style.display = src ? 'block' : 'none';
@@ -221,12 +241,12 @@ export class Hud implements GameSystem {
   private paintState(s: E33State): void {
     const pct = (a: number, b: number) => `${Math.max(0, Math.min(100, (a / Math.max(1, b)) * 100))}%`;
     this.el['bt-foe'].innerHTML = `
-      <div class="bt-name"><span>${s.trainer ? `${esc(s.trainer)} · ` : ''}${esc(s.foe.name)}${s.broken > 0 ? '<span class="bt-badge">ATURDIDO</span>' : ''}</span><span class="bt-lv">NV.${s.foe.level}</span></div>
+      <div class="bt-name"><span>${s.trainer ? `${esc(s.trainer)} · ` : ''}${esc(s.foe.name)}${s.broken > 0 ? '<span class="bt-badge">STUNNED</span>' : ''}</span><span class="bt-lv">LV.${s.foe.level}</span></div>
       <div class="bt-row"><span>HP</span><div class="hud-bar"><div class="hud-bar-fill ehp" style="width:${pct(s.foe.hp, s.foe.maxHp)}"></div></div></div>
       <div class="bt-row"><span>BRK</span><div class="hud-bar"><div class="hud-bar-fill brk" style="width:${pct(s.break, 100)}"></div></div></div>`;
     const pips = Array.from({ length: s.apMax }, (_, i) => `<i class="${i < s.ap ? 'on' : ''}"></i>`).join('');
     this.el['bt-ally'].innerHTML = `
-      <div class="bt-name"><span>${esc(s.ally.name)}</span><span class="bt-lv">NV.${s.ally.level}</span></div>
+      <div class="bt-name"><span>${esc(s.ally.name)}</span><span class="bt-lv">LV.${s.ally.level}</span></div>
       <div class="bt-row"><span>HP</span><div class="hud-bar"><div class="hud-bar-fill dhp" style="width:${pct(s.ally.hp, s.ally.maxHp)}"></div></div><span class="bt-num">${s.ally.hp}/${s.ally.maxHp}</span></div>
       <div class="bt-row"><span>AP</span><div class="bt-pips">${pips}</div></div>
       <div class="bt-row"><span>GRD</span><div class="hud-bar"><div class="hud-bar-fill grd${s.gradient >= 100 ? ' full' : ''}" style="width:${pct(s.gradient, 100)}"></div></div><span class="bt-num">${Math.round(s.gradient)}%</span></div>
@@ -246,13 +266,13 @@ export class Hud implements GameSystem {
       .join('');
     const dv = m.digivolve!;
     menu.innerHTML = `
-      <div class="bt-menu-title">¿QUÉ HARÁ ${esc(m.name ?? '')}?</div>
+      <div class="bt-menu-title">WHAT WILL ${esc((m.name ?? '').toUpperCase())} DO?</div>
       ${moves}
       <div class="bt-split">
         ${btn(5, 'ULT', `${Math.round(m.gradient ?? 0)}%`, 'ult', !!m.ult?.usable, '', 'special')}
-        ${btn(6, dv.to ? `→ ${dv.to}` : 'DIGIEVOL.', dv.cost !== null ? `${dv.cost}%` : '—', 'digivolve', dv.usable, '', 'special')}
-        ${btn(7, 'PUNTERÍA', '1 AP', 'aim', !!m.aim?.usable)}
-        ${btn(8, 'HUIR', '', 'run', true)}
+        ${btn(6, dv.to ? `→ ${dv.to}` : 'DIGIVOLVE', dv.cost !== null ? `${dv.cost}%` : '—', 'digivolve', dv.usable, '', 'special')}
+        ${btn(7, 'FREE AIM', '1 AP', 'aim', !!m.aim?.usable)}
+        ${btn(8, 'RUN', '', 'run', true)}
       </div>`;
     menu.classList.remove('hidden');
     for (const b of menu.querySelectorAll<HTMLButtonElement>('.bt-btn')) {
@@ -270,37 +290,71 @@ export class Hud implements GameSystem {
     this.bannerTimer = window.setTimeout(() => b.classList.add('hidden'), 2600);
   }
 
+  /** Starts the loading-style sweep: cursor and fill run the bar in battle time. */
+  private startSweep(lead: number, span: number, zones: WindowZone[], timeScale: number): void {
+    this.bar = { lead, span };
+    const total = lead + span;
+    const pct = (t: number) => `${((lead + t) / total) * 100}%`;
+    const lanes = this.el['bt-lanes'];
+    const h = 100 / Math.max(1, zones.length);
+    lanes.innerHTML = zones
+      .map((z, i) => {
+        const perfect = z.perfect !== undefined
+          ? `<i class="perfect" style="left:${pct(z.from)};width:${(Math.min(z.perfect, z.to) - z.from) / total * 100}%"></i>`
+          : '';
+        return `<div class="bt-lane ${z.type}" style="top:${i * h}%;height:${h}%">
+          <i style="left:${pct(z.from)};width:${((z.to - z.from) / total) * 100}%"></i>${perfect}<b>${esc(z.label)}</b></div>`;
+      })
+      .join('');
+    this.el['bt-impact'].style.left = pct(0);
+    for (const a of this.sweep) a.cancel();
+    const duration = (total * 1000) / Math.max(0.05, timeScale);
+    const opts: KeyframeAnimationOptions = { duration, easing: 'linear', fill: 'forwards' };
+    this.sweep = [
+      this.el['bt-cursor'].animate([{ left: '0%' }, { left: '100%' }], opts),
+      this.el['bt-fill'].animate([{ width: '0%' }, { width: '100%' }], opts),
+    ];
+  }
+
   private paintWindow(w: WindowState): void {
     const box = this.el['bt-defend'];
-    const ring = this.el['bt-ring'];
+    const prompt = this.el['bt-prompt'];
     const result = this.el['bt-result'];
     if (w.state === 'closed') {
-      ring.classList.remove('open');
-      this.ringAnim?.cancel();
+      for (const a of this.sweep) a.pause();
+      const { lead, span } = this.bar;
+      if (w.pressedAt !== null && w.pressedAt !== undefined) {
+        this.el['bt-press'].style.left = `${((lead + Math.min(span, w.pressedAt)) / (lead + span)) * 100}%`;
+      } else {
+        this.el['bt-press'].style.left = '100%';
+      }
+      box.classList.remove('perfect', 'good', 'miss');
+      box.classList.add(w.grade ?? 'miss');
       result.textContent = w.label ?? '';
-      result.classList.toggle('bad', w.result === 'clean' || w.result === 'whiff');
+      prompt.textContent = w.grade === 'perfect' ? 'PERFECT TIMING' : w.grade === 'good' ? 'SUCCESS' : w.result === 'clean' ? 'NO GUARD' : 'BAD TIMING';
+      prompt.classList.remove('now');
       clearTimeout(this.resultTimer);
-      this.resultTimer = window.setTimeout(() => box.classList.add('hidden'), 450);
+      this.resultTimer = window.setTimeout(() => box.classList.add('hidden'), 750);
       return;
     }
     clearTimeout(this.resultTimer);
-    box.classList.remove('hidden');
-    result.textContent = w.state === 'open' || w.state === 'follow-up' ? '¡AHORA!' : '';
-    result.classList.remove('bad');
-    ring.classList.toggle('open', w.state !== 'incoming');
-    ring.classList.toggle('gradient', w.hitType === 'gradient');
+    box.classList.remove('hidden', 'perfect', 'good', 'miss');
     this.el['bt-keys'].innerHTML = (w.keys ?? []).map((k) => `<span><b>${esc(k.key)}</b>${esc(k.label)}</span>`).join('');
-    this.ringAnim?.cancel();
+    result.textContent = '';
     if (w.state === 'incoming') {
-      this.ringAnim = ring.animate([{ transform: 'scale(2.6)', opacity: 0.2 }, { transform: 'scale(1)', opacity: 1 }], {
-        duration: (w.lead ?? 0.3) * 1000,
-        fill: 'forwards',
-      });
+      prompt.textContent = w.hitType === 'gradient' ? 'GRADIENT ATTACK — COUNTER!' : 'INCOMING — GET READY';
+      prompt.classList.remove('now');
+      this.startSweep(w.lead ?? 0.32, w.span ?? 0.5, w.zones ?? [], w.timeScale ?? 1);
+    } else if (w.state === 'open') {
+      prompt.textContent = 'NOW!';
+      prompt.classList.remove('now');
+      void prompt.offsetWidth;
+      prompt.classList.add('now');
     } else {
-      this.ringAnim = ring.animate([{ transform: 'scale(1)' }, { transform: 'scale(0.8)' }], {
-        duration: (w.duration ?? 0.4) * 1000,
-        fill: 'forwards',
-      });
+      prompt.textContent = 'COUNTER — PARRY!';
+      prompt.classList.add('now');
+      const d = w.duration ?? 0.18;
+      this.startSweep(0.08, d, [{ type: 'parry', label: 'PARRY', from: 0, to: d, perfect: d }], w.timeScale ?? 1);
     }
   }
 

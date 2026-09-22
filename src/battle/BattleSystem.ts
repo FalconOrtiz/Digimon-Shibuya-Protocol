@@ -6,6 +6,7 @@ import { clamp, lerp } from '../core/Noise';
 import { Battle, digivolveCost, AP_MAX, type BattleEvent, type E33Action, type Side } from './engine/BattleEngine';
 import { matchWindow, validInputs, DEFEND_KEYS, WINDOWS, type DefendResult, type WindowType } from './engine/DefendWindows';
 import type { TimelineHit } from './engine/timelines';
+import { parryExtension } from './engine/digichips';
 import { BattleArena } from './Arena';
 import { BattleFX } from './BattleFX';
 
@@ -70,18 +71,27 @@ interface PlayerLike {
 }
 
 const DEFEND_LABEL: Record<WindowType, string> = {
-  dodge: 'ESQUIVAR', parry: 'PARAR', jump: 'SALTAR', gradient: 'GRADIENT',
+  dodge: 'DODGE', parry: 'PARRY', jump: 'JUMP', gradient: 'GRADIENT',
 };
-const RESULT_LABEL: Partial<Record<DefendResult, string>> = {
-  'perfect-parry': '¡PARRY PERFECTO!',
-  'perfect-dodge': '¡ESQUIVA PERFECTA!',
-  parry: '¡PARRY!',
-  dodge: '¡ESQUIVADO!',
-  jump: '¡SALTO!',
-  gradient: '¡GRADIENT!',
-  whiff: '¡Tarde!',
+const RESULT_LABEL: Record<DefendResult, string> = {
+  'perfect-parry': 'PERFECT PARRY!',
+  'perfect-dodge': 'PERFECT DODGE!',
+  parry: 'PARRIED!',
+  dodge: 'DODGED!',
+  jump: 'JUMPED!',
+  gradient: 'GRADIENT!',
+  whiff: 'MISSED!',
+  clean: 'HIT!',
 };
-const KEY_LABEL: Record<string, string> = { Space: 'ESPACIO', KeyE: 'E', ShiftLeft: 'SHIFT', KeyF: 'F' };
+/** How the HUD grades a defence: gold, cyan, or red. */
+const RESULT_GRADE: Record<DefendResult, 'perfect' | 'good' | 'miss'> = {
+  'perfect-parry': 'perfect', 'perfect-dodge': 'perfect',
+  parry: 'good', dodge: 'good', jump: 'good', gradient: 'good',
+  whiff: 'miss', clean: 'miss',
+};
+const KEY_LABEL: Record<string, string> = { Space: 'SPACE', KeyE: 'E', ShiftLeft: 'SHIFT', KeyF: 'F' };
+/** Tail of the timing bar after the hit frame (covers the widest window). */
+const WINDOW_SPAN = 0.5;
 /** Atajos de teclado del menú: 1 básico, 2-4 skills, 5 ULT, 6 digievolución, 7 puntería, 8 huir. */
 const MENU_KEYS = ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Digit6', 'Digit7', 'Digit8'];
 /** Lead visual antes de cada hit frame (el HUD cierra el anillo en este tiempo). */
@@ -130,6 +140,8 @@ export class BattleSystem implements GameSystem {
   private pendingAction: E33Action | { type: 'aim' } | null = null;
   private defendInput: { type: WindowType; t: number } | null = null;
   private defendInjected: WindowType | null = null;
+  /** Real seconds of hit-stop left. */
+  private hitStop = 0;
   private windowOpenAt = 0;
   private aimShot: { x: number; y: number } | null = null;
   private tmp = new THREE.Vector3();
@@ -253,7 +265,7 @@ export class BattleSystem implements GameSystem {
     this.fx.dust(wildPad, 20);
     void this.animate(0.42, (t) => this.wild?.model.scale.setScalar(Math.max(0.001, easeOutBack(t))));
     const sayP = this.say(
-      this.request?.trainerName ? `¡${this.request.trainerName} te reta con ${b.wild.name}!` : `¡Un ${b.wild.name} salvaje aparece en el cruce!`,
+      this.request?.trainerName ? `${this.request.trainerName} challenges you with ${b.wild.name}!` : `A wild ${b.wild.name} appears on the crossing!`,
       1.0,
     );
 
@@ -270,7 +282,7 @@ export class BattleSystem implements GameSystem {
     this.marker = 'send-out';
     this.fx.ring(this.arena.padPlayer, 0x4de1ff, 1.4, 0.45);
     this.fx.sparkles(this.arena.padPlayer, 0x9fe8ff, 32);
-    await this.say(`¡Adelante, ${b.player.name}!`, 0.6);
+    await this.say(`Go, ${b.player.name}!`, 0.6);
     this.beginMenu();
   }
 
@@ -367,7 +379,7 @@ export class BattleSystem implements GameSystem {
   private enterAim(): void {
     const b = this.battle;
     if (!b || b.ap < 1) {
-      void this.say('Necesitas 1 AP para apuntar.', 0.6);
+      void this.say('You need 1 AP to aim.', 0.6);
       return;
     }
     this.phase = 'aim';
@@ -377,7 +389,7 @@ export class BattleSystem implements GameSystem {
     this.emitMenu(false);
     this.punchInOn('player');
     this.ctx.events.emit('battle:aim', { open: true });
-    void this.say('PUNTERÍA — clic sobre el núcleo del salvaje', 0.1);
+    void this.say('FREE AIM — click the wild Digimon\'s core', 0.1);
   }
 
   /** Resuelve el disparo: distancia en pantalla al punto débil proyectado. */
@@ -449,7 +461,7 @@ export class BattleSystem implements GameSystem {
     const b = this.battle!;
     const { event, timeline } = b.beginEnemyAttack();
     if (!timeline) {
-      if (event.kind === 'stat') await this.say(`${b.wild.name} está aturdido: pierde su turno.`, 0.8);
+      if (event.kind === 'stat') await this.say(`${b.wild.name} is stunned and loses its turn.`, 0.8);
       return;
     }
 
@@ -458,12 +470,13 @@ export class BattleSystem implements GameSystem {
     this.punchInOn('wild');
     this.ctx.events.emit('battle:turn', { actor: 'enemy', digimon: b.wild.name, action: timeline.name, phase: 'windup' });
     this.ctx.events.emit('battle:telegraph', { name: timeline.name, windup: timeline.windup, hits: timeline.hits.length });
-    const sayP = this.say(`${b.wild.name} prepara ${timeline.name.toUpperCase()}…`, 0.4);
+    const sayP = this.say(`${b.wild.name} is charging ${timeline.name.toUpperCase()}…`, 0.4);
 
     const mon = this.wild!.model;
     const pad = this.arena.padWild;
     const f = this.arena.forward;
     const kind = timeline.windup;
+    this.fx.charge(this.focusOf(mon), timeline.hits.some((h) => h.type === 'gradient') ? 0xff4dc8 : 0xff8a5a, timeline.windupTime * 0.9, 50);
     await this.animate(timeline.windupTime, (t) => {
       const c = Math.sin(t * Math.PI);
       mon.position.copy(pad);
@@ -493,7 +506,8 @@ export class BattleSystem implements GameSystem {
       prevT = hit.t;
 
       this.ctx.events.emit('battle:window', {
-        state: 'incoming', lead: INCOMING_LEAD, hitType: hit.type, keys: this.keysFor(hit.type),
+        state: 'incoming', lead: INCOMING_LEAD, span: WINDOW_SPAN, timeScale: this.timeScale,
+        hitType: hit.type, keys: this.keysFor(hit.type), zones: this.zonesFor(hit.type),
       });
       void this.animate(INCOMING_LEAD, (t) => {
         mon.position.copy(pad).addScaledVector(f, -Math.sin(t * Math.PI * 0.5) * this.arena.padGap * 0.9);
@@ -527,6 +541,16 @@ export class BattleSystem implements GameSystem {
     return validInputs(type).map((w) => ({ type: w, key: KEY_LABEL[DEFEND_KEYS[w]] ?? DEFEND_KEYS[w], label: DEFEND_LABEL[w] }));
   }
 
+  /** Success windows per valid input, in seconds after the hit frame, for the HUD timing bar. */
+  private zonesFor(type: TimelineHit['type']): { type: WindowType; label: string; from: number; to: number; perfect?: number }[] {
+    const chips = this.battle?.chips ?? [];
+    return validInputs(type).map((w) => {
+      const d = WINDOWS[w];
+      const to = w === 'parry' ? d.close + parryExtension(chips) : d.close;
+      return { type: w, label: DEFEND_LABEL[w], from: d.open, to: Math.min(WINDOW_SPAN, to), perfect: d.perfect };
+    });
+  }
+
   /** Abre la ventana del hit frame y espera el input (teclas reales o harness). */
   private async openDefendWindow(hit: TimelineHit): Promise<DefendResult> {
     const chips = this.battle!.chips;
@@ -535,7 +559,7 @@ export class BattleSystem implements GameSystem {
     this.defendInput = null;
     this.windowOpenAt = this.bt;
     this.marker = `defend:${hit.type}`;
-    this.ctx.events.emit('battle:window', { state: 'open', duration: WINDOWS.dodge.close, hitType: hit.type, keys: this.keysFor(hit.type) });
+    this.ctx.events.emit('battle:window', { state: 'open', duration: WINDOWS.dodge.close, timeScale: this.timeScale, hitType: hit.type, keys: this.keysFor(hit.type) });
 
     const longest = WINDOWS.dodge.close + 0.05;
     await this.waitFor(() => !!this.defendInjected || !!this.defendInput || this.bt - this.windowOpenAt > longest);
@@ -549,7 +573,10 @@ export class BattleSystem implements GameSystem {
     // Esquiva perfecta: abre un parry de remate dentro de la misma ventana.
     if (result === 'perfect-dodge' && hit.type !== 'gradient') {
       this.marker = 'defend:follow-up';
-      this.ctx.events.emit('battle:window', { state: 'follow-up', duration: WINDOWS.parry.close, hitType: hit.type, keys: this.keysFor('strike').filter((k) => k.type === 'parry') });
+      this.ctx.events.emit('battle:window', {
+        state: 'follow-up', duration: WINDOWS.parry.close, timeScale: this.timeScale, hitType: hit.type,
+        keys: this.keysFor('strike').filter((k) => k.type === 'parry'),
+      });
       const t0 = this.bt;
       const parried = () => this.pressed() === 'parry' || this.defendInjected === 'parry';
       await this.waitFor(() => parried() || this.bt - t0 > WINDOWS.parry.close);
@@ -559,8 +586,10 @@ export class BattleSystem implements GameSystem {
     }
 
     this.marker = result === 'clean' || result === 'whiff' ? 'resolve:hit' : `defend:${result}`;
-    this.ctx.events.emit('battle:window', { state: 'closed', result, label: RESULT_LABEL[result] ?? '' });
-    this.ctx.events.emit('battle:defend', { result, label: RESULT_LABEL[result] ?? '' });
+    this.ctx.events.emit('battle:window', {
+      state: 'closed', result, label: RESULT_LABEL[result], grade: RESULT_GRADE[result], pressedAt: pressed?.t ?? null,
+    });
+    this.ctx.events.emit('battle:defend', { result, label: RESULT_LABEL[result] });
     return result;
   }
 
@@ -573,17 +602,17 @@ export class BattleSystem implements GameSystem {
         return this.playMove(ev);
       case 'stat':
         if (ev.failed && ev.side === 'player') {
-          const why = ev.moveName === 'STUNNED' ? `${b.player.name} está aturdido.` :
-            ev.moveName === 'ULT' ? 'El Gradient no está al 100%.' :
-            ev.moveName === 'DIGIVOLVE' ? 'Aún no hay Gradient suficiente para digievolucionar.' :
-            `No hay AP suficiente para ${ev.moveName}.`;
+          const why = ev.moveName === 'STUNNED' ? `${b.player.name} is stunned.` :
+            ev.moveName === 'ULT' ? 'Gradient is not at 100% yet.' :
+            ev.moveName === 'DIGIVOLVE' ? 'Not enough Gradient to digivolve yet.' :
+            `Not enough AP for ${ev.moveName}.`;
           return this.say(why, 0.7);
         }
         return this.playStat(ev);
       case 'faint':
         return this.playFaint(ev.side);
       case 'run':
-        return this.say(ev.success ? '¡Escapaste!' : '¡No puedes escapar!', 0.8);
+        return this.say(ev.success ? 'Got away safely!' : 'You can\'t escape!', 0.8);
       case 'hit-frame':
         return this.playHitFrame(ev);
       case 'counter': {
@@ -595,26 +624,29 @@ export class BattleSystem implements GameSystem {
         w.anim.play('hit', 0.45);
         this.shake = 0.06;
         this.ctx.events.emit('battle:hit', { target: 'enemy', damage: ev.damage, crit: false, counter: true });
-        return this.say(`¡CONTRAATAQUE! −${ev.damage}`, 0.7);
+        return this.say(`COUNTERATTACK! −${ev.damage}`, 0.7);
       }
       case 'break':
         this.marker = 'break';
         this.fx.ring(this.arena.padWild, 0x37e0ff, 1.8, 0.5);
         this.ctx.events.emit('battle:flash', { color: '#37e0ff' });
-        return this.say(`¡DATA BREAK! ${b.wild.name} queda aturdido ${ev.turns} turnos.`, 1.0);
+        return this.say(`DATA BREAK! ${b.wild.name} is stunned for ${ev.turns} turns.`, 1.0);
       case 'ult': {
         this.marker = 'ult';
         this.punchInOn('player');
         const at = this.focusOf(this.wild!.model);
         this.ally!.anim.play('attack', 0.5);
-        await this.wait(0.2);
+        this.fx.charge(this.focusOf(this.ally!.model), 0xff4dc8, 0.5, 80);
+        await this.wait(0.45);
+        this.fx.pillar(this.arena.padWild, 0xff4dc8, 1.1, 7, 0.9);
         this.fx.impact(at, 0xff4dc8, 2.2);
         this.fx.ring(this.arena.padWild, 0xff4dc8, 2.4, 0.5);
+        this.hitStop = 0.16;
         this.wild!.anim.play('hit', 0.5);
         this.shake = 0.12;
         this.ctx.events.emit('battle:flash', { color: '#ff4dc8' });
         this.ctx.events.emit('battle:hit', { target: 'enemy', damage: ev.damage, crit: true });
-        return this.say(`¡PROTOCOLO ULTIMATE! −${ev.damage}`, 0.9);
+        return this.say(`ULTIMATE PROTOCOL! −${ev.damage}`, 0.9);
       }
       case 'digivolve':
         return this.playDigivolve(ev.to, ev.name);
@@ -623,9 +655,9 @@ export class BattleSystem implements GameSystem {
           this.fx.impact(this.focusOf(this.wild!.model), 0x6ef0ff, 1.4);
           this.wild!.anim.play('hit', 0.4);
           this.ctx.events.emit('battle:hit', { target: 'enemy', damage: ev.damage, crit: ev.mult >= 2 });
-          return this.say(ev.mult >= 2 ? `¡PUNTO DÉBIL! −${ev.damage}` : `¡Golpe! −${ev.damage}`, 0.7);
+          return this.say(ev.mult >= 2 ? `WEAK POINT! −${ev.damage}` : `Hit! −${ev.damage}`, 0.7);
         }
-        return this.say('¡Fallaste el disparo!', 0.6);
+        return this.say('The shot missed!', 0.6);
       default:
         return;
     }
@@ -642,7 +674,7 @@ export class BattleSystem implements GameSystem {
 
     this.marker = 'attack';
     this.punchInOn(ev.side);
-    const sayP = this.say(`¡${name} usa ${move.name.toUpperCase()}!`, 0.45);
+    const sayP = this.say(`${name} used ${move.name.toUpperCase()}!`, 0.45);
     attacker.anim.play('attack', 0.5);
 
     const from = this.focusOf(attacker.model);
@@ -675,16 +707,21 @@ export class BattleSystem implements GameSystem {
           attacker.model.position.lerpVectors(aPad, hitPoint, t * t);
           attacker.model.position.y = aPad.y + Math.sin(t * Math.PI) * (move.fx === 'dive' ? 0.6 : 0.2);
         });
+        const facing = to.clone().sub(from).setY(0).normalize();
+        if (move.fx === 'slash') this.fx.claws(to, facing, ev.side === 'player' ? 0xfff0d0 : 0xffc0e0);
+        else if (move.fx === 'dive') this.fx.shockwave(dPad, 0xfff0c4, 2.2, 0.5);
       }
     }
 
     if (ev.missed) {
       await sayP;
-      await this.say('¡Falló!', 0.6);
+      await this.say('It missed!', 0.6);
     } else {
       this.marker = 'impact';
       const strength = (ev.effectiveness > 1 ? 1.6 : ev.effectiveness < 1 ? 0.7 : 1) * (ev.crit ? 1.35 : 1);
       this.fx.impact(to, ev.effectiveness > 1 ? 0xffd24a : 0xffe9a8, strength);
+      if (ev.crit || ev.effectiveness > 1) this.ctx.events.emit('battle:flash', { color: ev.crit ? '#ffffff' : '#ffd24a' });
+      this.hitStop = 0.05 + 0.04 * strength;
       defender.anim.play('hit', 0.45);
       this.shake = 0.05 * strength;
       this.ctx.events.emit('battle:hit', {
@@ -692,9 +729,9 @@ export class BattleSystem implements GameSystem {
       });
       this.emitState();
       await sayP;
-      if (ev.crit) await this.say('¡Golpe crítico!', 0.5);
-      if (ev.effectiveness > 1) await this.say('¡Es muy eficaz!', 0.6);
-      else if (ev.effectiveness < 1) await this.say('No es muy eficaz…', 0.6);
+      if (ev.crit) await this.say('A critical hit!', 0.5);
+      if (ev.effectiveness > 1) await this.say('It\'s super effective!', 0.6);
+      else if (ev.effectiveness < 1) await this.say('It\'s not very effective…', 0.6);
     }
     await this.animate(0.2, (t) => attacker.model.position.lerpVectors(attacker.model.position, aPad, smooth(t)));
     attacker.model.position.copy(aPad);
@@ -707,11 +744,11 @@ export class BattleSystem implements GameSystem {
     this.punchInOn(ev.side);
     user.anim.play('attack', 0.4);
     this.fx.sonicRings(this.focusOf(user.model), this.focusOf(target.model));
-    await this.say(`¡${ev.side === 'player' ? b.player.name : b.wild.name} usa ${ev.moveName.toUpperCase()}!`, 0.5);
-    if (ev.failed) return this.say('Pero no tuvo efecto.', 0.5);
-    const stat = { atk: 'ATAQUE', def: 'DEFENSA', spe: 'VELOCIDAD', acc: 'PRECISIÓN' }[ev.stat];
+    await this.say(`${ev.side === 'player' ? b.player.name : b.wild.name} used ${ev.moveName.toUpperCase()}!`, 0.5);
+    if (ev.failed) return this.say('But it had no effect.', 0.5);
+    const stat = { atk: 'Attack', def: 'Defense', spe: 'Speed', acc: 'accuracy' }[ev.stat];
     const who = ev.target === 'player' ? b.player.name : b.wild.name;
-    return this.say(`La ${stat} de ${who} ${ev.delta < 0 ? 'baja' : 'sube'}.`, 0.6);
+    return this.say(`${who}'s ${stat} ${ev.delta < 0 ? 'fell' : 'rose'}!`, 0.6);
   }
 
   private async playHitFrame(ev: Extract<BattleEvent, { kind: 'hit-frame' }>): Promise<void> {
@@ -729,8 +766,14 @@ export class BattleSystem implements GameSystem {
       } else {
         ally.anim.play('attack', 0.25);
       }
-      this.fx.sparkles(at, ev.result === 'gradient' ? 0xff4dc8 : 0x6ef0ff, 18);
-      if (ev.result.includes('parry')) this.fx.impact(at, 0x6ef0ff, 0.8);
+      const perfect = ev.result.startsWith('perfect');
+      const tone = ev.result === 'gradient' ? 0xff4dc8 : perfect ? 0xffd24a : 0x6ef0ff;
+      this.fx.sparkles(at, tone, perfect ? 36 : 18);
+      this.fx.shockwave(pad, tone, perfect ? 1.8 : 1.2, 0.4);
+      if (ev.result.includes('parry')) {
+        this.fx.impact(at, tone, perfect ? 1.3 : 0.8);
+        this.fx.slash(at, this.arena.forward.clone().negate(), tone, 0.9, 0.2, 0.2);
+      }
       this.ctx.events.emit('battle:hit', { target: 'player', damage: 0, blocked: true, dodge: ev.result.includes('dodge') });
       await this.wait(0.32);
       m.position.copy(pad);
@@ -764,7 +807,7 @@ export class BattleSystem implements GameSystem {
       await this.animate(0.5, (t) => mon.model.scale.setScalar(Math.max(0.001, 1 - t)));
       mon.model.visible = false;
     }
-    await this.say(`¡${side === 'player' ? b.player.name : b.wild.name} se debilitó!`, 0.9);
+    await this.say(`${side === 'player' ? b.player.name : b.wild.name} fainted!`, 0.9);
   }
 
   private async playDigivolve(to: string, name: string): Promise<void> {
@@ -773,19 +816,22 @@ export class BattleSystem implements GameSystem {
     this.marker = 'digivolve';
     this.punchInOn('player');
     this.ctx.events.emit('battle:flash', { color: '#ffd24a' });
+    this.fx.charge(this.focusOf(ally.model), 0xffd24a, 0.9, 90);
+    this.fx.pillar(pad, 0xffd24a, 1.0, 8, 1.8);
     this.fx.ring(pad, 0xffd24a, 2.2, 0.6);
     this.fx.sparkles(pad, 0xfff0c4, 56);
     this.shake = 0.08;
-    await this.say(`¡${ally.species.name.toUpperCase()} DIGIEVOLUCIONA A…!`, 0.9);
+    await this.say(`${ally.species.name.toUpperCase()} DIGIVOLVES TO…!`, 0.9);
 
     this.digimon.transform(ally, to);
     const model = ally.model;
     model.scale.setScalar(0.001);
     this.fx.ring(pad, 0xff4dc8, 2.6, 0.5);
+    this.fx.flash(this.focusOf(model), 0xfff0c4, 3.2, 0.3);
     this.fx.sparkles(pad, 0x9fe8ff, 48);
     void this.animate(0.6, (t) => model.scale.setScalar(Math.max(0.001, easeOutBack(t))));
     this.ctx.events.emit('digimon:digivolved', { species: to, name });
-    await this.say(`¡${name}!`, 1.0);
+    await this.say(`${name}!`, 1.0);
     this.glideToWide(2);
   }
 
@@ -812,10 +858,10 @@ export class BattleSystem implements GameSystem {
       );
       ally.anim.play('win', 1.2);
       xp = xpForDefeating(b.wild.level);
-      await this.say(`¡Has derrotado a ${b.wild.name}!`, 1.1);
+      await this.say(`You defeated ${b.wild.name}!`, 1.1);
     } else if (result === 'defeat') {
       this.marker = 'defeat';
-      await this.say('Tu digimon no puede seguir… vuelve al Digivice.', 1.2);
+      await this.say('Your Digimon can\'t go on… returning to the Digivice.', 1.2);
     } else {
       this.marker = 'fled';
     }
@@ -825,7 +871,7 @@ export class BattleSystem implements GameSystem {
     if (xp > 0) {
       levels = this.digimon.grantXp(ally, xp);
       this.ctx.events.emit('digimon:xp', { digimon: ally.species.id, gained: xp, xp: 0 });
-      await this.say(levels > 0 ? `+${xp} XP · ¡${ally.species.name} sube a NV.${ally.level}!` : `+${xp} XP`, 0.9);
+      await this.say(levels > 0 ? `+${xp} XP · ${ally.species.name} grew to LV.${ally.level}!` : `+${xp} XP`, 0.9);
     }
 
     this.arena.hide();
@@ -957,7 +1003,10 @@ export class BattleSystem implements GameSystem {
   update(dt: number): void {
     this.arena.update(dt, this.bt);
     if (this.phase === 'idle') return;
-    const sdt = dt * this.timeScale;
+    // Hit-stop: a few frames of near-freeze sell the weight of a big impact.
+    const stop = this.hitStop > 0 && this.phase !== 'defend';
+    this.hitStop = Math.max(0, this.hitStop - dt);
+    const sdt = dt * this.timeScale * (stop ? 0.06 : 1);
     this.bt += sdt;
 
     for (let i = this.waits.length - 1; i >= 0; i--) {

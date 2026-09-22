@@ -11,11 +11,11 @@ export interface DigiChipDef {
 }
 
 export const DIGICHIPS: DigiChipDef[] = [
-  { id: 'pepper-pack', name: 'Pepper Pack', desc: '+10% daño de habilidades', slot: 0 },
-  { id: 'reflex-core', name: 'Reflex Core', desc: '+25 ms de ventana de parry', slot: 1 },
-  { id: 'ap-overclock', name: 'AP Overclock', desc: '+1 AP tras parar un combo entero', slot: 2 },
-  { id: 'break-bit', name: 'Break Bit', desc: '+8 break en ataques básicos', slot: 0 },
-  { id: 'gradual-charge', name: 'Gradual Charge', desc: '+2% Gradient por turno propio', slot: 1 },
+  { id: 'pepper-pack', name: 'Pepper Pack', desc: '+10% skill damage', slot: 0 },
+  { id: 'reflex-core', name: 'Reflex Core', desc: '+25 ms parry window', slot: 1 },
+  { id: 'ap-overclock', name: 'AP Overclock', desc: '+1 AP after parrying a full combo', slot: 2 },
+  { id: 'break-bit', name: 'Break Bit', desc: '+8 break on basic attacks', slot: 0 },
+  { id: 'gradual-charge', name: 'Gradual Charge', desc: '+2% Gradient per own turn', slot: 1 },
 ];
 
 export const DEFAULT_CHIPS = ['pepper-pack', 'reflex-core', 'ap-overclock'];

@@ -258,10 +258,10 @@ export class Atmosphere implements GameSystem {
 
   private phaseName(): string {
     const h = this.hour;
-    if (h >= 5 && h < 12) return 'mañana';
-    if (h >= 12 && h < 17) return 'tarde';
-    if (h >= 17 && h < 20) return 'atardecer';
-    return 'noche';
+    if (h >= 5 && h < 12) return 'morning';
+    if (h >= 12 && h < 17) return 'afternoon';
+    if (h >= 17 && h < 20) return 'dusk';
+    return 'night';
   }
 
   private fitShadowFrustum(): void {

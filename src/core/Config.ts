@@ -21,9 +21,9 @@ export interface QualityTier {
 }
 
 export const QUALITY: Record<QualityName, QualityTier> = {
-  low: { name: 'low', label: 'Baja', pixelRatioCap: 1, shadowMapSize: 1024, ssao: false, bloom: true, dof: false, msaaSamples: 0, bakeSize: 256, crowd: 60, particleBudget: 200, far: 420 },
-  medium: { name: 'medium', label: 'Media', pixelRatioCap: 1.25, shadowMapSize: 2048, ssao: true, bloom: true, dof: false, msaaSamples: 2, bakeSize: 512, crowd: 110, particleBudget: 600, far: 520 },
-  high: { name: 'high', label: 'Alta', pixelRatioCap: 1.5, shadowMapSize: 4096, ssao: true, bloom: true, dof: true, msaaSamples: 4, bakeSize: 512, crowd: 160, particleBudget: 1200, far: 600 },
+  low: { name: 'low', label: 'Low', pixelRatioCap: 1, shadowMapSize: 1024, ssao: false, bloom: true, dof: false, msaaSamples: 0, bakeSize: 256, crowd: 60, particleBudget: 200, far: 420 },
+  medium: { name: 'medium', label: 'Medium', pixelRatioCap: 1.25, shadowMapSize: 2048, ssao: true, bloom: true, dof: false, msaaSamples: 2, bakeSize: 512, crowd: 110, particleBudget: 600, far: 520 },
+  high: { name: 'high', label: 'High', pixelRatioCap: 1.5, shadowMapSize: 4096, ssao: true, bloom: true, dof: true, msaaSamples: 4, bakeSize: 512, crowd: 160, particleBudget: 1200, far: 600 },
   ultra: { name: 'ultra', label: 'Ultra', pixelRatioCap: 2, shadowMapSize: 4096, ssao: true, bloom: true, dof: true, msaaSamples: 4, bakeSize: 1024, crowd: 200, particleBudget: 1600, far: 600 },
 };
 

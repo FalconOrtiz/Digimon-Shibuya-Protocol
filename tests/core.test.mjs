@@ -61,6 +61,6 @@ test('topoSort: las deps van antes aunque tengan más deps propias', () => {
 });
 
 test('topoSort: ciclo y dependencia desconocida son errores', () => {
-  assert.throws(() => topoSort([sys('a', ['b']), sys('b', ['a'])]), /Ciclo/);
-  assert.throws(() => topoSort([sys('a', ['nope'])]), /no está registrado/);
+  assert.throws(() => topoSort([sys('a', ['b']), sys('b', ['a'])]), /Dependency cycle/);
+  assert.throws(() => topoSort([sys('a', ['nope'])]), /is not registered/);
 });

@@ -163,6 +163,7 @@ export class DigimonSystem implements GameSystem {
   }
 
   getActive(): PartyMember {
+    if (this.active.hp > 0) return this.active;
     return this.party.find((m) => m.hp > 0) ?? this.party[0];
   }
 

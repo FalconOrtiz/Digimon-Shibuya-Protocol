@@ -47,7 +47,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['pepper-breath', 'tackle-rush'],
     weakPoints: core(2, 0.22),
     color: 0xe08030,
-    description: 'Un digimon reptil que sueña con ser fuerte. Su Pepper Breath quema todo.',
+    description: 'A reptile Digimon who dreams of growing strong. Its Pepper Breath scorches everything.',
     digivolvesTo: 'greymon',
   },
   patamon: {
@@ -57,7 +57,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['wing-gust', 'sonic-sweep'],
     weakPoints: core(2, 0.2),
     color: 0xf0a040,
-    description: 'Una cría alada alegre. Sus Boom Bubbles explotan con sorpresa.',
+    description: 'A cheerful winged pup. Its Boom Bubbles pop with a surprise.',
     digivolvesTo: 'angemon',
   },
   greymon: {
@@ -67,7 +67,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['pepper-breath', 'tackle-rush'],
     weakPoints: core(2, 0.24),
     color: 0xe88a2a,
-    description: 'Dinosaurio de casco óseo. Su Nova Blast funde el asfalto.',
+    description: 'A bone-helmed dinosaur. Its Nova Blast melts the asphalt.',
     digivolvesTo: 'metalgreymon',
   },
   angemon: {
@@ -77,7 +77,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['wing-gust', 'sonic-sweep'],
     weakPoints: core(2, 0.22),
     color: 0xf2efe8,
-    description: 'Ángel guerrero de seis alas. Su Hand of Fate purifica datos corruptos.',
+    description: 'A six-winged warrior angel. Its Hand of Fate purges corrupted data.',
     digivolvesTo: 'magnaangemon',
   },
   metalgreymon: {
@@ -87,7 +87,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['pepper-breath', 'tackle-rush'],
     weakPoints: core(2, 0.26),
     color: 0xe88a2a,
-    description: 'Cyborg de brazo metálico. Su Giga Destroyer arrasa manzanas enteras.',
+    description: 'A cyborg with a metal arm. Its Giga Destroyer levels whole blocks.',
   },
   magnaangemon: {
     id: 'magnaangemon', name: 'MagnaAngemon', element: 'holy', stage: 'ultimate',
@@ -96,7 +96,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['wing-gust', 'sonic-sweep'],
     weakPoints: core(2, 0.24),
     color: 0xf2efe8,
-    description: 'Ángel acorazado. Abre la Gate of Destiny sobre el cruce.',
+    description: 'An armoured angel. It opens the Gate of Destiny above the crossing.',
   },
   koromon: {
     id: 'koromon', name: 'Koromon', element: 'neutral', stage: 'in-training', wild: true,
@@ -105,7 +105,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['tackle-rush', 'bubble-spray'],
     weakPoints: core(2.2, 0.2),
     color: 0xffb0a0,
-    description: 'Un digimon esférico rosa que bota por Shibuya. Débil pero insistente.',
+    description: 'A round pink Digimon bouncing around Shibuya. Weak but persistent.',
   },
   nyaromon: {
     id: 'nyaromon', name: 'Nyaromon', element: 'neutral', stage: 'in-training', wild: true,
@@ -114,7 +114,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['tail-lash', 'tackle-rush'],
     weakPoints: core(2.2, 0.18),
     color: 0xffd27a,
-    description: 'Un digimon gatuno que ronronea. Su cola golpea más de lo que parece.',
+    description: 'A purring cat-like Digimon. Its tail hits harder than it looks.',
   },
   bukamon: {
     id: 'bukamon', name: 'Bukamon', element: 'water', stage: 'in-training', wild: true,
@@ -123,7 +123,7 @@ export const DIGIMON_SPECIES: Record<string, SpeciesDef> = {
     attacks: ['bubble-spray', 'tail-lash'],
     weakPoints: core(2.2, 0.2),
     color: 0x7ac0ff,
-    description: 'Un digimon marino que nada por los charcos de Shibuya después de llover.',
+    description: 'A sea Digimon that swims through Shibuya\'s puddles after the rain.',
   },
 };
 

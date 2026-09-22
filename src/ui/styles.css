@@ -170,16 +170,79 @@ html, body {
   display: flex; align-items: center; justify-content: center;
   pointer-events: auto;
 }
+/* Physical device from the model sheet: beige notched shell, blue ring
+   bezel with pink ticks, cyan-framed screen, strap, three side buttons. */
+.dv-device {
+  position: relative;
+  padding: 34px 40px;
+  filter: drop-shadow(0 24px 40px rgba(0, 8, 24, 0.6));
+  animation: dvIn 0.22s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+@keyframes dvIn { from { transform: scale(0.9) translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+.dv-strap {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  width: 46%; height: 60px; z-index: -1;
+  background:
+    linear-gradient(90deg, transparent 8%, rgba(77, 240, 230, 0.9) 8% 10%, transparent 10% 90%, rgba(77, 240, 230, 0.9) 90% 92%, transparent 92%),
+    repeating-linear-gradient(60deg, transparent 0 16px, rgba(77, 240, 230, 0.55) 16px 19px, transparent 19px 34px),
+    repeating-linear-gradient(-60deg, transparent 0 16px, rgba(255, 95, 168, 0.45) 16px 19px, transparent 19px 34px),
+    linear-gradient(180deg, #3a3c9a, #2a2c7c);
+}
+.dv-strap.top { top: -18px; border-radius: 10px 10px 0 0; }
+.dv-strap.bottom { bottom: -18px; border-radius: 0 0 10px 10px; }
+.dv-shell {
+  padding: 26px;
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(255, 255, 255, 0.35), transparent 55%),
+    linear-gradient(160deg, #e9d2b0 0%, #d7b68c 55%, #c29a6c 100%);
+  clip-path: polygon(
+    12% 0, 28% 0, 29% 4.5%, 39% 4.5%, 40% 0, 60% 0, 61% 4.5%, 71% 4.5%, 72% 0, 88% 0,
+    100% 10%, 100% 28%, 97% 29.5%, 97% 39.5%, 100% 41%, 100% 59%, 97% 60.5%, 97% 70.5%, 100% 72%, 100% 90%,
+    88% 100%, 72% 100%, 71% 95.5%, 61% 95.5%, 60% 100%, 40% 100%, 39% 95.5%, 29% 95.5%, 28% 100%, 12% 100%,
+    0 90%, 0 72%, 3% 70.5%, 3% 60.5%, 0 59%, 0 41%, 3% 39.5%, 3% 29.5%, 0 28%, 0 10%
+  );
+  box-shadow: inset 0 -6px 0 rgba(120, 80, 40, 0.35), inset 0 4px 0 rgba(255, 255, 255, 0.4);
+}
+.dv-bezel {
+  position: relative;
+  padding: 18px;
+  border-radius: 46px;
+  background: radial-gradient(ellipse at 50% 30%, #7fa6e0, #4a6fbf 60%, #3a579e);
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.35), inset 0 -4px 0 rgba(20, 30, 80, 0.45), 0 2px 0 rgba(90, 60, 30, 0.4);
+}
+.dv-bezel::before {
+  content: ''; position: absolute; inset: 4px; padding: 7px; border-radius: 42px; pointer-events: none;
+  background: repeating-conic-gradient(from 4deg, rgba(255, 95, 168, 0.9) 0 7deg, transparent 7deg 24deg);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+.dv-btn {
+  position: absolute; border: none; cursor: pointer; padding: 0;
+  box-shadow: inset 0 -5px 0 rgba(0, 0, 0, 0.3), inset 0 4px 0 rgba(255, 255, 255, 0.35), 0 3px 6px rgba(0, 0, 0, 0.35);
+  transition: transform 0.08s, filter 0.15s;
+}
+.dv-btn:hover { filter: brightness(1.15); }
+.dv-btn:active { transform: scale(0.92); }
+.dv-btn.blue {
+  left: 8px; top: 50%; width: 46px; height: 58px; margin-top: -29px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 30%, #6a7cff, #2a34d8 60%, #1a1f8a);
+  border: 3px solid #1a1f6a;
+}
+.dv-btn.yellow, .dv-btn.green {
+  right: 6px; width: 58px; height: 38px; border-radius: 50%;
+  border: 3px solid rgba(40, 30, 10, 0.55);
+}
+.dv-btn.yellow { top: calc(50% - 48px); background: radial-gradient(circle at 40% 30%, #fff08a, #d8b020 65%, #9a7a10); }
+.dv-btn.green { top: calc(50% + 10px); background: radial-gradient(circle at 40% 30%, #b8ff8a, #4ab030 65%, #2a7a18); }
 .digivice-frame {
-  width: min(580px, 92vw);
-  max-height: 84vh;
-  background: rgba(10, 16, 32, 0.88);
-  border: 1px solid rgba(77, 225, 255, 0.55);
-  border-radius: 20px;
-  box-shadow: 0 20px 50px rgba(0, 8, 24, 0.65), inset 0 0 40px rgba(77, 225, 255, 0.06);
+  width: min(540px, 76vw);
+  max-height: 72vh;
+  background: rgba(10, 16, 32, 0.96);
+  border: 3px solid #4df0e6;
+  border-radius: 18px;
+  box-shadow: 0 0 16px rgba(77, 240, 230, 0.45), inset 0 0 40px rgba(77, 225, 255, 0.08);
   display: flex; flex-direction: column;
   overflow: hidden;
-  backdrop-filter: blur(16px);
 }
 .dv-header {
   display: flex; justify-content: space-between; align-items: center;
@@ -214,8 +277,8 @@ html, body {
 .dv-content {
   padding: 16px 18px;
   overflow-y: auto;
-  min-height: 300px;
-  max-height: 52vh;
+  min-height: 260px;
+  max-height: 44vh;
 }
 .dv-footer {
   padding: 10px 18px;

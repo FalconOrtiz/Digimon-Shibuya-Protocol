@@ -12,7 +12,7 @@ const FIXED_DT = 1 / FIXED_HZ;
 
 function systemId(sys: GameSystem): string {
   const cls = sys.constructor as unknown as SystemClass;
-  if (!cls.id) throw new Error(`Sistema sin static id: ${sys.constructor.name}`);
+  if (!cls.id) throw new Error(`System without a static id: ${sys.constructor.name}`);
   return cls.id;
 }
 
@@ -33,11 +33,11 @@ export function topoSort(systems: GameSystem[]): GameSystem[] {
     const id = systemId(sys);
     const st = state.get(id);
     if (st === 'done') return;
-    if (st === 'visiting') throw new Error(`Ciclo de dependencias: ${[...trail, id].join(' -> ')}`);
+    if (st === 'visiting') throw new Error(`Dependency cycle: ${[...trail, id].join(' -> ')}`);
     state.set(id, 'visiting');
     for (const dep of systemDeps(sys)) {
       const d = byId.get(dep);
-      if (!d) throw new Error(`Sistema '${id}' depende de '${dep}', que no está registrado`);
+      if (!d) throw new Error(`System '${id}' depends on '${dep}', which is not registered`);
       visit(d, [...trail, id]);
     }
     state.set(id, 'done');
@@ -114,7 +114,7 @@ export class Engine {
   }
 
   register<T extends GameSystem>(system: T): T {
-    if (!system || typeof system.init !== 'function') throw new Error('Sistema inválido: necesita init(ctx)');
+    if (!system || typeof system.init !== 'function') throw new Error('Invalid system: init(ctx) is required');
     const id = systemId(system);
     if (this.systems.has(id)) throw new Error(`Sistema duplicado: ${id}`);
     this.systems.set(id, system);

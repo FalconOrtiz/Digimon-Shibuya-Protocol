@@ -1,31 +1,36 @@
 import * as THREE from 'three';
 import { metaSurface, boxProjectedUV, type Ball } from '../fx/Sculpt';
 import { creatureSkin } from '../fx/materials/CreatureMaterials';
-import { makeRng, lerp, clamp } from '../core/Noise';
+import { makeRng, clamp } from '../core/Noise';
 import { createRig, IdleAnimator, disposeCreature, type Creature } from './shared';
-import { fixOutward, weldDecimate, markSculpt, ramp, buildEye, clawGeometry, type MarkField } from './sculpt-util';
+import {
+  fixOutward, weldDecimate, markSculpt, ramp, buildEye, clawGeometry, makeSurfaceProbe, type MarkField,
+} from './sculpt-util';
 
 /**
  * Agumon — upright little fire dinosaur, the fire partner.
  *
- * Reference: `docs/referencias/assets/agumon01.png` — orange bipedal
- * dinosaur, big head with a wide jaw, small arms with white claws, stocky
- * legs, a tapering tail and green eyes. The reference is faceted low-poly:
- * the sculpt is welded coarse and flat-shaded so the planes read.
+ * Reference: `D:/Digimon/references/partners/agumon01.png` — a big head that
+ * sits straight on the shoulders (no neck), a long rounded snout that sticks
+ * out past the belly in profile, heavy brow ridges over huge green eyes, a
+ * pear-shaped body with a lighter belly, stubby arms and short thick legs
+ * that each end in three white claws, and a thick tail. The reference is
+ * faceted low-poly: the sculpt is welded coarse and flat-shaded so the
+ * planes read.
  */
 
 /* ------------------------------------------------------------------ */
 /* Palette                                                             */
 /* ------------------------------------------------------------------ */
 
-const SKIN = 0xe8782a;      // orange body (reference dominant colour)
-const BELLY = 0xf29a4c;     // lighter orange belly, not cream
+const SKIN = 0xee8a3a;      // orange body (reference dominant colour)
+const BELLY = 0xf29c52;     // lighter orange belly, not cream
 const CLAW = 0xf4f0ea;      // white claws
 const IRIS = 0x3aa84a;      // green eyes
 const IRIS_EMISSIVE = 0x16602a;
 /** Weld cell sizes: coarse enough that the facets of the reference show. */
-const BODY_FACET = 0.016;
-const HEAD_FACET = 0.0125;
+const BODY_FACET = 0.022;
+const HEAD_FACET = 0.018;
 
 /* ------------------------------------------------------------------ */
 /* Build                                                               */
@@ -89,194 +94,171 @@ export function buildAgumon(): Creature {
   });
 
   /* ---- Body -------------------------------------------------------- */
-  // Stocky dino torso: chest, waist, belly, hips; short thick arms; bowed
-  // legs with real feet; the tail leaves the hips and sweeps back.
+  // Pear-shaped: narrow shoulders that the head swallows, a round belly
+  // that is the widest point, broad hips, stubby arms hanging out and
+  // forward, short thick legs on big three-toed feet.
   const bodyBalls: Ball[] = [
-    { x: 0, y: 0.360, z: -0.004, r: 0.052, sy: 0.90 },                     // neck
-    { x: 0, y: 0.312, z: 0.010, r: 0.098, sx: 1.02, sy: 0.92, sz: 0.90 },  // chest
-    { x: 0, y: 0.262, z: 0.014, r: 0.082, sx: 0.94, sy: 0.86, sz: 0.92 },  // waist
-    { x: 0, y: 0.212, z: 0.014, r: 0.100, sx: 1.00, sy: 0.90, sz: 0.98 },  // belly
-    { x: 0, y: 0.156, z: -0.002, r: 0.096, sx: 1.08, sy: 0.78, sz: 0.96 }, // hips
-    { x: 0, y: 0.170, z: -0.070, r: 0.058, sz: 1.10 },                     // tail root
-    // waist pinch
-    { x: 0.104, y: 0.264, z: 0.012, r: 0.052, sx: 0.90, sy: 1.25, sz: 1.05, strength: -0.54 },
-    { x: -0.104, y: 0.264, z: 0.012, r: 0.052, sx: 0.90, sy: 1.25, sz: 1.05, strength: -0.54 },
-    // neck notch
-    { x: 0, y: 0.400, z: -0.020, r: 0.084, sy: 0.28, strength: -0.62 },
+    { x: 0, y: 0.352, z: -0.006, r: 0.082, sx: 1.10, sy: 0.80, sz: 0.94 }, // shoulders
+    { x: 0, y: 0.296, z: 0.006, r: 0.108, sx: 1.00, sy: 0.92, sz: 0.94 },  // chest
+    { x: 0, y: 0.214, z: 0.020, r: 0.128, sx: 1.00, sy: 0.96, sz: 0.96 },  // belly
+    { x: 0, y: 0.146, z: -0.006, r: 0.114, sx: 1.08, sy: 0.80, sz: 0.98 }, // hips
+    { x: 0, y: 0.158, z: -0.092, r: 0.070, sy: 0.96, sz: 1.10 },           // tail root
 
-    // arms: short and chunky, posed slightly out and forward
-    { x: 0.092, y: 0.304, z: 0.006, r: 0.046 },
-    { x: -0.092, y: 0.304, z: 0.006, r: 0.046 },
-    { x: 0.128, y: 0.282, z: 0.014, r: 0.038 },
-    { x: -0.128, y: 0.282, z: 0.014, r: 0.038 },
-    { x: 0.156, y: 0.262, z: 0.028, r: 0.034 },                            // elbow
-    { x: -0.156, y: 0.262, z: 0.028, r: 0.034 },
-    { x: 0.176, y: 0.248, z: 0.050, r: 0.031 },                            // forearm
-    { x: -0.176, y: 0.248, z: 0.050, r: 0.031 },
-    { x: 0.190, y: 0.240, z: 0.070, r: 0.028 },                            // wrist
-    { x: -0.190, y: 0.240, z: 0.070, r: 0.028 },
-    { x: 0.198, y: 0.234, z: 0.090, r: 0.034, sy: 0.76, sz: 0.94 },        // palm
-    { x: -0.198, y: 0.234, z: 0.090, r: 0.034, sy: 0.76, sz: 0.94 },
-    // shoulder notch
-    { x: 0.086, y: 0.270, z: 0.014, r: 0.028, sx: 0.7, sy: 1.15, strength: -0.26 },
-    { x: -0.086, y: 0.270, z: 0.014, r: 0.028, sx: 0.7, sy: 1.15, strength: -0.26 },
+    // arms: shoulder -> elbow -> hand, splayed out and a touch forward
+    { x: 0.108, y: 0.318, z: 0.020, r: 0.044 },
+    { x: -0.108, y: 0.318, z: 0.020, r: 0.044 },
+    { x: 0.140, y: 0.284, z: 0.034, r: 0.038 },
+    { x: -0.140, y: 0.284, z: 0.034, r: 0.038 },
+    { x: 0.162, y: 0.248, z: 0.052, r: 0.033 },
+    { x: -0.162, y: 0.248, z: 0.052, r: 0.033 },
+    { x: 0.172, y: 0.222, z: 0.064, r: 0.032, sx: 0.90, sy: 0.84 },       // hand
+    { x: -0.172, y: 0.222, z: 0.064, r: 0.032, sx: 0.90, sy: 0.84 },
+    // armpit notch keeps the arms from fusing into the chest
+    { x: 0.114, y: 0.262, z: 0.030, r: 0.030, sx: 0.8, sy: 1.2, strength: -0.30 },
+    { x: -0.114, y: 0.262, z: 0.030, r: 0.030, sx: 0.8, sy: 1.2, strength: -0.30 },
 
-    // legs: thigh -> knee -> shin -> ankle -> foot
-    { x: 0.078, y: 0.130, z: -0.002, r: 0.058, sy: 1.00 },
-    { x: -0.078, y: 0.130, z: -0.002, r: 0.058, sy: 1.00 },
-    { x: 0.081, y: 0.090, z: 0.014, r: 0.042 },                            // knee
-    { x: -0.081, y: 0.090, z: 0.014, r: 0.042 },
-    { x: 0.082, y: 0.084, z: 0.033, r: 0.023, strength: 0.58 },            // kneecap
-    { x: -0.082, y: 0.084, z: 0.033, r: 0.023, strength: 0.58 },
-    { x: 0.081, y: 0.062, z: 0.018, r: 0.034 },                            // shin
-    { x: -0.081, y: 0.062, z: 0.018, r: 0.034 },
-    { x: 0.082, y: 0.038, z: 0.012, r: 0.024 },                            // ankle
-    { x: -0.082, y: 0.038, z: 0.012, r: 0.024 },
-    // feet
-    { x: 0.082, y: 0.017, z: -0.008, r: 0.028, sy: 0.58, sz: 0.84 },       // heel
-    { x: -0.082, y: 0.017, z: -0.008, r: 0.028, sy: 0.58, sz: 0.84 },
-    { x: 0.084, y: 0.016, z: 0.030, r: 0.032, sy: 0.50, sz: 1.00 },        // ball
-    { x: -0.084, y: 0.016, z: 0.030, r: 0.032, sy: 0.50, sz: 1.00 },
-    // ankle undercut + crotch notch
-    { x: 0.082, y: 0.036, z: -0.026, r: 0.024, sy: 0.9, strength: -0.34 },
-    { x: -0.082, y: 0.036, z: -0.026, r: 0.024, sy: 0.9, strength: -0.34 },
-    { x: 0, y: 0.072, z: 0.008, r: 0.052, sx: 0.42, sz: 1.4, strength: -0.60 },
+    // legs: thick thigh -> short shin -> big foot
+    { x: 0.078, y: 0.100, z: 0.004, r: 0.070 },
+    { x: -0.078, y: 0.100, z: 0.004, r: 0.070 },
+    { x: 0.082, y: 0.056, z: 0.014, r: 0.052 },
+    { x: -0.082, y: 0.056, z: 0.014, r: 0.052 },
+    { x: 0.084, y: 0.024, z: 0.000, r: 0.046, sy: 0.56, sz: 0.90 },       // heel
+    { x: -0.084, y: 0.024, z: 0.000, r: 0.046, sy: 0.56, sz: 0.90 },
+    { x: 0.086, y: 0.022, z: 0.044, r: 0.046, sy: 0.50, sz: 1.00 },       // ball of the foot
+    { x: -0.086, y: 0.022, z: 0.044, r: 0.046, sy: 0.50, sz: 1.00 },
+    // crotch notch
+    { x: 0, y: 0.050, z: 0.012, r: 0.058, sx: 0.44, sz: 1.5, strength: -0.62 },
   ];
 
-  // Toes with white claws.
-  const toeTips: THREE.Vector3[] = [];
-  for (const s of [1, -1]) {
-    for (const off of [-1, 0, 1]) {
-      const px = 0.084 + off * 0.021;
-      bodyBalls.push({ x: s * px, y: 0.015, z: 0.058, r: 0.0150, sy: 0.66, sz: 1.20 });
-      bodyBalls.push({ x: s * (px + off * 0.006), y: 0.014, z: 0.080, r: 0.0120, sy: 0.62 });
-      toeTips.push(new THREE.Vector3(s * (px + off * 0.010), 0.016, 0.093));
-      if (off < 1) {
-        bodyBalls.push({
-          x: s * (px + 0.0105), y: 0.015, z: 0.072, r: 0.013, sx: 0.40, sz: 1.6, strength: -0.46,
-        });
-      }
-    }
-  }
-
-  const BODY_RES = 42;
-  let bodyGeo = metaSurface(bodyBalls, { resolution: BODY_RES, smooth: 0.86, padding: 0.026 });
+  const BODY_RES = 44;
+  let bodyGeo = metaSurface(bodyBalls, { resolution: BODY_RES, smooth: 0.86, padding: 0.03 });
   fixOutward(bodyGeo, 'agumon-body');
   bodyGeo = weldDecimate(bodyGeo, BODY_FACET);
   bodyGeo.setAttribute('uv', boxProjectedUV(bodyGeo, 17));
 
-  // Cream belly field: angular about a per-height centre line, tapering to
-  // zero at the throat and crotch (same technique as Charmander).
+  // Lighter belly: an angular wedge about a per-height centre line, zero at
+  // the throat and the crotch.
   const BODY_AXIS: [number, number][] = [
-    [0.030, 0.004], [0.100, 0.000], [0.156, -0.002], [0.212, 0.014],
-    [0.262, 0.014], [0.312, 0.010], [0.400, -0.004],
+    [0.040, 0.010], [0.146, -0.006], [0.214, 0.020], [0.296, 0.006], [0.380, -0.006],
   ];
   const BODY_HALF: [number, number][] = [
-    [0.030, 0.00], [0.066, 0.34], [0.112, 0.58], [0.158, 0.74],
-    [0.206, 0.82], [0.252, 0.80], [0.298, 0.70], [0.344, 0.54],
-    [0.390, 0.32], [0.428, 0.00],
+    [0.060, 0.00], [0.100, 0.42], [0.150, 0.70], [0.210, 0.84],
+    [0.270, 0.78], [0.320, 0.58], [0.360, 0.30], [0.390, 0.00],
   ];
   const bodyMark: MarkField = (x, y, z) =>
     ramp(BODY_HALF, y) - Math.abs(Math.atan2(x, z - ramp(BODY_AXIS, y)));
-  markSculpt(bodyGeo, new THREE.Vector3(0, 0.22, 0), bodyMark, 0.22, 4);
+  markSculpt(bodyGeo, new THREE.Vector3(0, 0.21, 0), bodyMark, 0.22, 4);
 
   const body = new THREE.Mesh(bodyGeo, painted);
   body.castShadow = true;
   body.receiveShadow = true;
   rig.body.add(body);
 
-  // Toe claws.
-  const footClaw = clawGeometry(0.024, 0.0080);
-  for (const p of toeTips) {
-    const c = new THREE.Mesh(footClaw, clawMat);
-    c.position.copy(p).add(new THREE.Vector3(0, 0.001, -0.009));
-    c.rotation.set(Math.PI * 0.63, 0, 0);
+  const probeBody = makeSurfaceProbe(bodyGeo);
+  const clawAt = (geo: THREE.BufferGeometry, origin: THREE.Vector3, dir: THREE.Vector3, tilt: THREE.Euler) => {
+    const hit = probeBody(origin, dir);
+    if (!hit) return;
+    const c = new THREE.Mesh(geo, clawMat);
+    c.position.copy(hit.point).addScaledVector(hit.normal, -0.004);
+    c.rotation.copy(tilt);
     c.castShadow = true;
     rig.body.add(c);
+  };
+
+  // Three toe claws per foot, fanned across the front of the foot.
+  const footClaw = clawGeometry(0.030, 0.0105);
+  for (const s of [1, -1]) {
+    for (const off of [-1, 0, 1]) {
+      const x = s * 0.086 + off * 0.026;
+      clawAt(footClaw, new THREE.Vector3(x, 0.016, 0.02), new THREE.Vector3(off * 0.25, 0, 1),
+        new THREE.Euler(Math.PI * 0.60, off * 0.25, 0));
+    }
+  }
+  // Three finger claws per hand, pointing down and in.
+  const handClaw = clawGeometry(0.026, 0.0085);
+  for (const s of [1, -1]) {
+    for (const off of [-1, 0, 1]) {
+      clawAt(handClaw, new THREE.Vector3(s * 0.172, 0.222, 0.064 + off * 0.016), new THREE.Vector3(s * 0.25, -1, off * 0.35),
+        new THREE.Euler(Math.PI * 0.94 - off * 0.25, 0, -s * 0.35));
+    }
   }
 
   /* ---- Head -------------------------------------------------------- */
-  // Big rounded dino head: tall cranium, wide cheeks, short muzzle with a
-  // broad jaw, and a subtle brow ridge so it reads as a reptile, not a bear.
-  rig.head.position.set(0, 0.452, 0.002);
+  // Big round cranium sat straight on the shoulders, a long rounded snout
+  // that pushes well forward, heavy brow ridges and a wide jaw.
+  rig.head.position.set(0, 0.392, 0.004);
+  rig.head.scale.setScalar(1.14);
 
   const headBalls: Ball[] = [
-    { x: 0, y: 0.026, z: 0.000, r: 0.088, sx: 1.08, sy: 1.02, sz: 0.84 },   // cranium
-    { x: 0, y: 0.008, z: -0.040, r: 0.052, sy: 0.96, sz: 0.62 },            // occiput
-    { x: 0.060, y: 0.016, z: -0.002, r: 0.050, sy: 0.96 },                  // temples
-    { x: -0.060, y: 0.016, z: -0.002, r: 0.050, sy: 0.96 },
-    { x: 0.052, y: -0.028, z: 0.016, r: 0.046, sz: 0.98 },                  // cheeks
-    { x: -0.052, y: -0.028, z: 0.016, r: 0.046, sz: 0.98 },
-    // Muzzle — slightly snouty, blends into the face
-    { x: 0, y: -0.024, z: 0.048, r: 0.054, sx: 0.94, sy: 0.86, sz: 0.94 },  // muzzle root
-    { x: 0, y: -0.020, z: 0.078, r: 0.043, sx: 0.86, sy: 0.78, sz: 0.92 },  // muzzle mid
-    { x: 0, y: -0.010, z: 0.094, r: 0.034, sx: 0.82, sy: 0.74, sz: 0.72 },  // snout tip
-    // Jaw — wide lower jaw
-    { x: 0, y: -0.052, z: 0.024, r: 0.047, sx: 1.00, sy: 0.56, sz: 1.00 },  // jaw
-    { x: 0, y: -0.046, z: 0.068, r: 0.031, sx: 0.84, sy: 0.48, sz: 0.90 },  // lower lip
-    { x: 0, y: -0.042, z: 0.086, r: 0.019, sx: 0.64, sy: 0.42, sz: 0.66 },  // chin
-    // back-of-skull carve + neck notch
-    { x: 0, y: -0.014, z: -0.058, r: 0.052, sy: 1.20, sz: 0.85, strength: -0.62 },
-    { x: 0, y: -0.055, z: -0.036, r: 0.082, sy: 0.28, strength: -0.62 },
+    { x: 0, y: 0.036, z: -0.010, r: 0.108, sx: 1.04, sy: 0.96, sz: 0.96 }, // cranium
+    { x: 0.056, y: 0.010, z: 0.012, r: 0.064 },                           // cheeks
+    { x: -0.056, y: 0.010, z: 0.012, r: 0.064 },
+    // snout: long and rounded, the upper jaw slightly over the lower
+    { x: 0, y: -0.004, z: 0.070, r: 0.070, sx: 1.02, sy: 0.74, sz: 1.00 },
+    { x: 0, y: -0.002, z: 0.118, r: 0.056, sx: 0.96, sy: 0.70, sz: 1.00 },
+    { x: 0, y: 0.002, z: 0.152, r: 0.042, sx: 0.96, sy: 0.72, sz: 0.90 },
+    { x: 0, y: -0.040, z: 0.070, r: 0.058, sx: 1.00, sy: 0.54, sz: 1.00 }, // lower jaw
+    { x: 0, y: -0.036, z: 0.116, r: 0.042, sx: 0.90, sy: 0.50, sz: 0.94 },
+    // brow ridges over the eyes
+    { x: 0.050, y: 0.094, z: 0.050, r: 0.028, sx: 1.20, sy: 0.50, sz: 0.80 },
+    { x: -0.050, y: 0.094, z: 0.050, r: 0.028, sx: 1.20, sy: 0.50, sz: 0.80 },
+    // eye sockets so the big eyes sit into the face
+    { x: 0.050, y: 0.054, z: 0.084, r: 0.030, sx: 1.05, sy: 1.10, strength: -0.22 },
+    { x: -0.050, y: 0.054, z: 0.084, r: 0.030, sx: 1.05, sy: 1.10, strength: -0.22 },
+    // mouth groove between the jaws
+    { x: 0, y: -0.022, z: 0.104, r: 0.064, sx: 1.08, sy: 0.12, sz: 1.0, strength: -0.36 },
   ];
 
-  const HEAD_RES = 46;
-  let headGeo = metaSurface(headBalls, { resolution: HEAD_RES, smooth: 0.92, padding: 0.024 });
+  const HEAD_RES = 48;
+  let headGeo = metaSurface(headBalls, { resolution: HEAD_RES, smooth: 0.9, padding: 0.028 });
   fixOutward(headGeo, 'agumon-head');
   headGeo = weldDecimate(headGeo, HEAD_FACET);
   headGeo.setAttribute('uv', boxProjectedUV(headGeo, 17));
 
   // The reference head is one colour; only the belly field is lighter.
-  const headMark: MarkField = () => -1;
-  markSculpt(headGeo, new THREE.Vector3(0, 0, 0.01), headMark, 0.20, 1);
+  markSculpt(headGeo, new THREE.Vector3(0, 0, 0.01), () => -1, 0.20, 1);
 
   const head = new THREE.Mesh(headGeo, painted);
   head.castShadow = true;
   head.receiveShadow = true;
   rig.head.add(head);
+  const probeHead = makeSurfaceProbe(headGeo);
 
   /* ---- Eyes -------------------------------------------------------- */
-  // Big green eyes on the front of the face.
-  // The reference eyes are huge: nearly a third of the face width each.
-  const EYE_W = 0.0330;
-  const EYE_H = 0.0400;
+  // Huge green eyes set into the sockets under the brow.
+  const EYE_W = 0.044;
+  const EYE_H = 0.052;
   for (const s of [1, -1]) {
-    const { holder, lid } = buildEye(EYE_W, EYE_H, s, 0.34, plainSkin, IRIS, IRIS_EMISSIVE);
-    holder.position.set(s * 0.0420, 0.0300, 0.0560);
+    const { holder, lid } = buildEye(EYE_W, EYE_H, s, 0.36, plainSkin, IRIS, IRIS_EMISSIVE);
+    const hit = probeHead(new THREE.Vector3(s * 0.030, 0.056, 0), new THREE.Vector3(s * 0.36, 0, 1));
+    if (hit) holder.position.copy(hit.point).addScaledVector(hit.normal, -EYE_W * 0.30);
+    else holder.position.set(s * 0.050, 0.056, 0.082);
     rig.head.add(holder);
     rig.eyes.push(holder);
     rig.eyelids.push(lid);
   }
 
-  /* ---- Mouth: wide friendly grin ------------------------------------ */
-  // A simple dark strip along the jaw line — Agumon's grin is broad and
-  // upturned at the corners.
+  /* ---- Mouth: wide grin along the jaw line ------------------------ */
+  // A thin dark strip projected onto the groove between the jaws, turned
+  // up at the back corners.
   const mouthGeo = new THREE.BufferGeometry();
   {
-    const A = 1.25;
+    const W = 28;
     const pos: number[] = [];
     const idx: number[] = [];
-    const W = 18;
-    const H = 3;
-    const lipY = (a: number) => -0.036 + (1 - Math.cos(a)) * 0.026;
-    const lipZ = (a: number) => 0.086 - Math.abs(Math.sin(a)) * 0.014;
-    for (let j = 0; j <= H; j++) {
-      for (let i = 0; i <= W; i++) {
-        const a = lerp(-A, A, i / W);
-        const t = j / H;
-        pos.push(
-          Math.sin(a) * 0.052,
-          lipY(a) - t * 0.022,
-          lipZ(a) - t * 0.030,
-        );
-      }
+    const A = 1.35;
+    for (let i = 0; i <= W; i++) {
+      const a = -A + (2 * A * i) / W;
+      const y = -0.022 + (Math.abs(a) / A) ** 2.2 * 0.016;
+      const dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a) * 1.6);
+      const hit = probeHead(new THREE.Vector3(0, y, 0.06), dir);
+      const p = hit ? hit.point.addScaledVector(hit.normal, 0.0015) : new THREE.Vector3(0, y, 0.15);
+      const half = 0.0034 * (1 - (Math.abs(a) / A) ** 3 * 0.6);
+      pos.push(p.x, p.y + half, p.z, p.x, p.y - half, p.z);
     }
-    for (let j = 0; j < H; j++) {
-      for (let i = 0; i < W; i++) {
-        const r0 = j * (W + 1) + i;
-        const r1 = r0 + W + 1;
-        idx.push(r0, r1, r0 + 1, r0 + 1, r1, r1 + 1);
-      }
+    for (let i = 0; i < W; i++) {
+      const a = i * 2;
+      idx.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
     }
     mouthGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     mouthGeo.setIndex(idx);
@@ -285,45 +267,46 @@ export function buildAgumon(): Creature {
   const mouth = new THREE.Mesh(
     mouthGeo,
     new THREE.MeshPhysicalMaterial({
-      color: 0x5a1d0d, roughness: 1.0, specularIntensity: 0.04,
+      color: 0x4a160a, roughness: 1.0, specularIntensity: 0.04,
       side: THREE.DoubleSide,
     }),
   );
   mouth.castShadow = false;
   rig.head.add(mouth);
 
-  // Two tiny nostril dots.
+  // Two nostrils on top of the snout tip.
   const nostrilMat = new THREE.MeshStandardMaterial({ color: 0x7a3410, roughness: 0.85 });
   for (const s of [1, -1]) {
-    const n = new THREE.Mesh(new THREE.SphereGeometry(0.0017, 8, 6), nostrilMat);
-    n.position.set(s * 0.0100, 0.0020, 0.1080);
-    n.scale.set(1, 0.8, 0.4);
+    const n = new THREE.Mesh(new THREE.SphereGeometry(0.0042, 8, 6), nostrilMat);
+    const hit = probeHead(new THREE.Vector3(s * 0.016, 0.005, 0.1), new THREE.Vector3(s * 0.15, 0.35, 1));
+    if (hit) n.position.copy(hit.point);
+    else n.position.set(s * 0.016, 0.014, 0.178);
+    n.scale.set(1.2, 0.7, 0.5);
     rig.head.add(n);
   }
 
   /* ---- Tail -------------------------------------------------------- */
-  // Tapers back and slightly down, then curls up at the tip.
+  // Thick at the root, sweeps back and down, then lifts slightly at the tip.
   const tail = new THREE.Group();
-  tail.position.set(0, 0.170, -0.070);
+  tail.position.set(0, 0.158, -0.092);
   rig.body.add(tail);
   rig.tail = tail;
 
   const tailCurve = new THREE.CatmullRomCurve3([
     new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(0.020, -0.030, -0.050),
-    new THREE.Vector3(0.058, -0.048, -0.098),
-    new THREE.Vector3(0.110, -0.030, -0.138),
-    new THREE.Vector3(0.160, 0.020, -0.158),
-    new THREE.Vector3(0.190, 0.080, -0.160),
+    new THREE.Vector3(0.006, -0.040, -0.070),
+    new THREE.Vector3(0.024, -0.072, -0.150),
+    new THREE.Vector3(0.056, -0.074, -0.226),
+    new THREE.Vector3(0.094, -0.046, -0.286),
+    new THREE.Vector3(0.124, -0.006, -0.316),
   ]);
-  const TAIL_SEG = 24;
-  const TAIL_RAD = 11;
-  const TAIL_R0 = 0.050;
-  const TAIL_TIP = 0.30;
-  const tailEase = (t: number): number => t ** 1.55;
+  const TAIL_SEG = 22;
+  const TAIL_RAD = 9;
+  const TAIL_R0 = 0.066;
+  const TAIL_TIP = 0.22;
+  const tailEase = (t: number): number => t ** 1.25;
   const tailGeo = new THREE.TubeGeometry(tailCurve, TAIL_SEG, TAIL_R0, TAIL_RAD, false);
   {
-    // Reuse taperTube-style manual taper (imported via shared? no — inline).
     const pos = tailGeo.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i <= TAIL_SEG; i++) {
       const t = i / TAIL_SEG;
@@ -366,11 +349,8 @@ export function buildAgumon(): Creature {
       anim.update(dt, elapsed, attention);
       tail.rotation.y = Math.sin(elapsed * 0.82) * (0.09 + attention * 0.09);
       tail.rotation.x = Math.sin(elapsed * 1.1 + 0.6) * 0.045;
-      // Tail flick — a little life even at rest.
       tail.rotation.z = Math.sin(elapsed * 1.7) * 0.04;
-      // Body idle bob (independent of animator's squash).
       rig.body.position.y = Math.sin(elapsed * 1.3) * 0.004;
-      // rnd is used to keep the rng "warm" — future anim hooks reuse it.
       void rnd;
     },
     celebrate: () => anim.celebrate(),

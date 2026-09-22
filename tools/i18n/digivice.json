@@ -1,0 +1,20 @@
+[
+  ["desc: 'Pan energético. Recupera 30 HP.'", "desc: 'Energy bread. Restores 30 HP.'"],
+  ["name: 'Poción', desc: 'Líquido azul. Recupera 50 HP.'", "name: 'Potion', desc: 'Blue tonic. Restores 50 HP.'"],
+  ["name: 'Chip de datos', desc: 'Fragmento de código digimon. Sirve para incubar.'", "name: 'Data Chip', desc: 'A fragment of Digimon code. Used for incubation.'"],
+  ["label: 'INVENTARIO'", "label: 'ITEMS'"],
+  ["label: 'MAPA'", "label: 'MAP'"],
+  ["label: 'PERFIL'", "label: 'PROFILE'"],
+  ["label: 'HUEVOS'", "label: 'EGGS'"],
+  ["'ESC abrir/cerrar · ←→ pestañas · clic en un objeto para usarlo'", "'ESC open/close · ←→ tabs · click an item to use it'"],
+  ["`${m.species.name} ya tiene la vida al máximo.`", "`${m.species.name} is already at full health.`"],
+  ["`${def.name}: ${m.species.name} recupera ${def.heal} HP.`", "`${def.name}: ${m.species.name} restored ${def.heal} HP.`"],
+  ["<span class=\"dv-card-lv\">NV.${m.level}</span>", "<span class=\"dv-card-lv\">LV.${m.level}</span>"],
+  ["<span>VEL</span>", "<span>SPD</span>"],
+  ["Amistad: ", "Friendship: "],
+  ["Victorias: <b>${t.wins}</b> · Derrotas: <b>${t.losses}</b>", "Wins: <b>${t.wins}</b> · Losses: <b>${t.losses}</b>"],
+  ["Vida ${Math.round(this.player.hp)}/${cfg.hp} · Energía ${Math.round(this.player.stamina)}/${cfg.staminaMax}", "Health ${Math.round(this.player.hp)}/${cfg.hp} · Energy ${Math.round(this.player.stamina)}/${cfg.staminaMax}"],
+  ["'<div class=\"dv-empty\">Sin insignias aún. Derrota trainers para ganarlas.</div>'", "'<div class=\"dv-empty\">No badges yet. Defeat trainers to earn them.</div>'"],
+  ["`¡El digihuevo eclosionó: ${e.name} se une al equipo!`", "`The DigiEgg hatched: ${e.name} joined your team!`"],
+  ["'<div class=\"dv-empty\">Sin digihuevos. Explora Shibuya y busca huevos brillantes.</div>'", "'<div class=\"dv-empty\">No DigiEggs. Explore Shibuya and look for glowing eggs.</div>'"]
+]

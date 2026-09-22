@@ -1,15 +1,18 @@
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { roundedBox, metaSurface, bakeCavityAO, type Ball } from '../fx/Sculpt';
 import { creatureSkin } from '../fx/materials/CreatureMaterials';
+import {
+  armGeometry, bagGeometry, chibiPartMatrix, chibiPose, faceGeometry, hairGeometry, handGeometry, headGeometry,
+  hipsGeometry, legGeometry, shoeGeometry, torsoGeometry,
+  type ChibiPose, type ChibiSlot, type HairStyle, type TopStyle,
+} from '../fx/Chibi';
 import type { Ctx, GameSystem } from '../core/Context';
 import type { Rng } from '../core/Rng';
 import { LAYOUT, groundHeightAt } from '../core/Layout';
 
 /**
- * The scramble crowd: chibi pedestrians (head ≈ 1/3.5 of the body, as in the
- * cartoon reference) sculpted once and instanced per part. Clothing, skin and
- * hair vary through instance colours, so 200 people cost ~10 draw calls.
+ * The scramble crowd: chibi pedestrians from the shared `fx/Chibi` kit (the
+ * trainer uses the same parts) instanced per part. Clothing, skin and hair
+ * vary through styles and instance colours, so 200 people cost ~16 draw calls.
  * Crossers walk corner to corner (diagonals included); strollers walk the
  * sidewalks of each arm.
  */
@@ -20,11 +23,9 @@ const SKIN = [0xf0d0b0, 0xe0b890, 0xc89870, 0x9a6a48];
 const HAIR = [0x1e1c22, 0x3a2a22, 0x6a4a2e, 0xc8a060, 0xb04838, 0x3a3a48];
 const SHOES = [0x1a1a1e, 0xf0f0f0, 0x6a4a34, 0xd84a3a];
 
-const HIP = 0.56;
-const LEG = 0.5;
-const SHOULDER = HIP + 0.4;
-const ARM = 0.34;
-const HEAD_Y = HIP + 0.66;
+const HAIR_STYLES: HairStyle[] = ['short', 'bun', 'bob', 'pony', 'spiky'];
+const TOP_STYLES: TopStyle[] = ['tee', 'hoodie'];
+const BAGS = [0x2a2e3a, 0xd8544e, 0xe0b040, 0x4a7ec8, 0x6a4a34];
 
 interface Walker {
   x: number;
@@ -42,38 +43,16 @@ interface Walker {
   yaw: number;
   top: number;
   hair: number;
+  bag: boolean;
+  /** Instance slots inside the per-style meshes. */
+  topSlot: number;
+  hairSlot: number;
+  bagSlot: number;
 }
 
-type Part = 'torso0' | 'torso1' | 'head' | 'hair0' | 'hair1' | 'eyes' | 'legs' | 'shoes' | 'arms' | 'hands';
+type Part = `torso.${TopStyle}` | `hair.${HairStyle}` | 'hips' | 'head' | 'face' | 'bag' | 'legs' | 'shoes' | 'arms' | 'hands';
 
 const ARMS: [number, number][] = [[0, -1], [0, 1], [1, 0], [-1, 0]];
-
-function sculptTorso(coat: boolean): THREE.BufferGeometry {
-  const balls: Ball[] = [
-    { x: 0, y: 0.3, z: 0, r: 0.19, sx: 1.2, sz: 0.8 },
-    { x: 0, y: 0.13, z: 0, r: 0.17, sx: 1.1, sz: 0.78 },
-    { x: 0, y: 0.02, z: 0, r: 0.16, sx: 1.15, sz: 0.8 },
-    { x: -0.15, y: 0.34, z: 0, r: 0.08 },
-    { x: 0.15, y: 0.34, z: 0, r: 0.08 },
-  ];
-  if (coat) balls.push({ x: 0, y: -0.12, z: 0, r: 0.17, sx: 1.25, sz: 0.85 }, { x: 0, y: 0.36, z: -0.08, r: 0.12, sx: 1.4 });
-  const g = metaSurface(balls, { resolution: 24 });
-  bakeCavityAO(g, new THREE.Vector3(0, 0.15, 0), 0.4);
-  return g;
-}
-
-function hairGeo(style: 0 | 1): THREE.BufferGeometry {
-  const cap = new THREE.SphereGeometry(0.212, 22, 12, 0, Math.PI * 2, 0, Math.PI * (style === 0 ? 0.62 : 0.5));
-  cap.rotateX(-0.25);
-  cap.translate(0, 0.02, -0.015);
-  if (style === 0) return cap;
-  const bun = new THREE.SphereGeometry(0.085, 14, 10);
-  bun.translate(0, 0.19, -0.12);
-  const g = mergeGeometries([cap, bun], false)!;
-  cap.dispose();
-  bun.dispose();
-  return g;
-}
 
 export class Crowd implements GameSystem {
   static id = 'crowd';
@@ -84,7 +63,6 @@ export class Crowd implements GameSystem {
   private rng!: Rng;
   private people: Walker[] = [];
   private parts = {} as Record<Part, THREE.InstancedMesh>;
-  private dummy = new THREE.Object3D();
   private corners: [number, number][] = [];
 
   init(ctx: Ctx): this {
@@ -137,8 +115,12 @@ export class Crowd implements GameSystem {
       arm: r.pick(ARMS),
       side: r.pick([-1, 1]),
       yaw: 0,
-      top: r.int(0, 1),
-      hair: r.int(0, 1),
+      top: r.int(0, TOP_STYLES.length - 1),
+      hair: r.int(0, HAIR_STYLES.length - 1),
+      bag: r.chance(0.35),
+      topSlot: 0,
+      hairSlot: 0,
+      bagSlot: 0,
     };
     if (cross) {
       const [cx, cz] = r.pick(this.corners);
@@ -192,50 +174,55 @@ export class Crowd implements GameSystem {
   private build(n: number): void {
     const cloth = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0, vertexColors: true });
     cloth.name = 'crowd.cloth';
-    const plain = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.78, metalness: 0 });
-    plain.name = 'crowd.plain';
     const skin = creatureSkin({ color: 0xffffff, wrap: 0.45, rim: 0.22, roughness: 0.6, detail: 'none' });
-    const hair = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0 });
+    skin.vertexColors = true;
+    const hair = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0, vertexColors: true });
     hair.name = 'crowd.hair';
-    const eye = new THREE.MeshStandardMaterial({ color: 0x14100e, roughness: 0.25, metalness: 0 });
+    const face = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0, vertexColors: true });
+    face.name = 'crowd.face';
 
-    const n0 = this.people.filter((p) => p.top === 0).length;
-    const h0 = this.people.filter((p) => p.hair === 0).length;
-    this.inst('torso0', sculptTorso(false), cloth, Math.max(1, n0));
-    this.inst('torso1', sculptTorso(true), cloth, Math.max(1, n - n0));
-    const head = new THREE.SphereGeometry(0.2, 22, 16);
-    head.scale(1, 0.96, 0.98);
-    this.inst('head', head, skin, n);
-    this.inst('hair0', hairGeo(0), hair, Math.max(1, h0));
-    this.inst('hair1', hairGeo(1), hair, Math.max(1, n - h0));
-    const eyes = new THREE.SphereGeometry(0.03, 10, 8);
-    eyes.scale(0.8, 1.25, 0.45);
-    this.inst('eyes', eyes, eye, n * 2);
-    const leg = new THREE.CapsuleGeometry(0.068, LEG - 0.12, 4, 10);
-    this.inst('legs', leg, plain, n * 2);
-    const shoe = roundedBox(0.12, 0.08, 0.2, 0.035, 2);
-    this.inst('shoes', shoe, plain, n * 2);
-    const arm = new THREE.CapsuleGeometry(0.052, ARM - 0.1, 4, 10);
-    this.inst('arms', arm, plain, n * 2);
-    const hand = new THREE.SphereGeometry(0.055, 10, 8);
-    this.inst('hands', hand, skin, n * 2);
+    const slots = new Map<string, number>();
+    const take = (key: string) => {
+      const v = slots.get(key) ?? 0;
+      slots.set(key, v + 1);
+      return v;
+    };
+    for (const p of this.people) {
+      p.topSlot = take(`torso.${TOP_STYLES[p.top]}`);
+      p.hairSlot = take(`hair.${HAIR_STYLES[p.hair]}`);
+      if (p.bag) p.bagSlot = take('bag');
+    }
+    for (const t of TOP_STYLES) this.inst(`torso.${t}`, torsoGeometry(t), cloth, Math.max(1, slots.get(`torso.${t}`) ?? 0));
+    for (const h of HAIR_STYLES) this.inst(`hair.${h}`, hairGeometry(h), hair, Math.max(1, slots.get(`hair.${h}`) ?? 0));
+    this.inst('bag', bagGeometry(), cloth, Math.max(1, slots.get('bag') ?? 0));
+    this.inst('hips', hipsGeometry(), cloth, n);
+    this.inst('head', headGeometry(), skin, n);
+    this.inst('face', faceGeometry(), face, n);
+    this.parts.face.castShadow = false;
+    this.inst('legs', legGeometry(), cloth, n * 2);
+    this.inst('shoes', shoeGeometry(), cloth, n * 2);
+    this.inst('arms', armGeometry(), cloth, n * 2);
+    this.inst('hands', handGeometry(), skin, n * 2);
+    // Only the big volumes cast; small parts disappear in the soft VSM anyway.
+    for (const k of ['hands', 'shoes', 'bag', 'hips', ...HAIR_STYLES.map((h) => `hair.${h}`)] as Part[]) {
+      this.parts[k].castShadow = false;
+    }
 
     // Colours are fixed per person; only matrices change per frame.
     const col = new THREE.Color();
-    const c = { torso0: 0, torso1: 0, hair0: 0, hair1: 0 };
     this.people.forEach((p, i) => {
       const top = col.setHex(this.rng.pick(TOPS)).clone();
-      const tk = `torso${p.top}` as 'torso0' | 'torso1';
-      this.parts[tk].setColorAt(c[tk]++, top);
+      this.parts[`torso.${TOP_STYLES[p.top]}`].setColorAt(p.topSlot, top);
       this.parts.arms.setColorAt(i * 2, top);
       this.parts.arms.setColorAt(i * 2 + 1, top);
       const sk = col.setHex(this.rng.pick(SKIN)).clone();
       this.parts.head.setColorAt(i, sk);
       this.parts.hands.setColorAt(i * 2, sk);
       this.parts.hands.setColorAt(i * 2 + 1, sk);
-      const hk = `hair${p.hair}` as 'hair0' | 'hair1';
-      this.parts[hk].setColorAt(c[hk]++, col.setHex(this.rng.pick(HAIR)));
+      this.parts[`hair.${HAIR_STYLES[p.hair]}`].setColorAt(p.hairSlot, col.setHex(this.rng.pick(HAIR)));
+      if (p.bag) this.parts.bag.setColorAt(p.bagSlot, col.setHex(this.rng.pick(BAGS)));
       const bottom = col.setHex(this.rng.pick(BOTTOMS)).clone();
+      this.parts.hips.setColorAt(i, bottom);
       const shoe = col.setHex(this.rng.pick(SHOES)).clone();
       for (const s of [0, 1]) {
         this.parts.legs.setColorAt(i * 2 + s, bottom);
@@ -272,58 +259,41 @@ export class Crowd implements GameSystem {
     this.write();
   }
 
-  private set(part: Part, i: number, x: number, y: number, z: number, yaw: number, s: number, rx = 0, rz = 0): void {
-    const d = this.dummy;
-    d.position.set(x, y, z);
-    d.rotation.set(rx, yaw, rz, 'YXZ');
-    d.scale.setScalar(s);
-    d.updateMatrix();
-    this.parts[part].setMatrixAt(i, d.matrix);
+  private readonly pose: ChibiPose = { bob: 0, leg: 0, arm: 0, tilt: 0 };
+  private readonly root4 = new THREE.Matrix4();
+  private readonly local4 = new THREE.Matrix4();
+  private readonly quat = new THREE.Quaternion();
+  private readonly up = new THREE.Vector3(0, 1, 0);
+  private readonly tmpV = new THREE.Vector3();
+  private readonly tmpS = new THREE.Vector3();
+
+  private put(part: Part, i: number, slot: ChibiSlot): void {
+    chibiPartMatrix(slot, this.pose, this.local4);
+    this.parts[part].setMatrixAt(i, this.local4.premultiply(this.root4));
   }
 
   private write(): void {
-    const c = { torso0: 0, torso1: 0, hair0: 0, hair1: 0 };
     this.people.forEach((w, i) => {
-      const s = w.scale;
-      const g = groundHeightAt(w.x, w.z);
-      const walking = w.wait <= 0;
-      const swing = walking ? Math.sin(w.phase) * 0.42 : 0;
-      const bob = walking ? Math.abs(Math.cos(w.phase)) * 0.025 * s : 0;
-      const fx = Math.sin(w.yaw);
-      const fz = Math.cos(w.yaw);
-      const rx = fz;
-      const rz = -fx;
-      const base = g + bob;
-
-      const tk = `torso${w.top}` as 'torso0' | 'torso1';
-      this.set(tk, c[tk]++, w.x, base + HIP * s, w.z, w.yaw, s);
-      this.set('head', i, w.x, base + HEAD_Y * s, w.z, w.yaw, s);
-      const hk = `hair${w.hair}` as 'hair0' | 'hair1';
-      this.set(hk, c[hk]++, w.x, base + HEAD_Y * s, w.z, w.yaw, s);
-      for (const side of [-1, 1]) {
-        const k = i * 2 + (side > 0 ? 1 : 0);
-        const ex = w.x + (rx * 0.075 * side + fx * 0.182) * s;
-        const ez = w.z + (rz * 0.075 * side + fz * 0.182) * s;
-        this.set('eyes', k, ex, base + (HEAD_Y - 0.01) * s, ez, w.yaw, s);
-
-        const a = swing * side;
-        const hx = w.x + rx * 0.085 * side * s;
-        const hz = w.z + rz * 0.085 * side * s;
-        const hy = base + HIP * s;
-        const lx = Math.sin(a) * LEG * s;
-        const ly = Math.cos(a) * LEG * s;
-        this.set('legs', k, hx + fx * lx * 0.5, hy - ly * 0.5, hz + fz * lx * 0.5, w.yaw, s, -a);
-        this.set('shoes', k, hx + fx * (lx + 0.03 * s), Math.max(g + 0.04 * s, hy - ly), hz + fz * (lx + 0.03 * s), w.yaw, s);
-
-        const b = -a * 0.8;
-        const sx = w.x + rx * 0.225 * side * s;
-        const sz = w.z + rz * 0.225 * side * s;
-        const sy = base + SHOULDER * s;
-        const ax = Math.sin(b) * ARM * s;
-        const ay = Math.cos(b) * ARM * s;
-        this.set('arms', k, sx + fx * ax * 0.5, sy - ay * 0.5, sz + fz * ax * 0.5, w.yaw, s, -b, 0.12 * side);
-        this.set('hands', k, sx + fx * ax, sy - ay, sz + fz * ax, w.yaw, s);
-      }
+      chibiPose(w.phase, w.wait <= 0 ? 1 : 0, this.pose);
+      this.root4.compose(
+        this.tmpV.set(w.x, groundHeightAt(w.x, w.z), w.z),
+        this.quat.setFromAxisAngle(this.up, w.yaw),
+        this.tmpS.setScalar(w.scale),
+      );
+      this.put(`torso.${TOP_STYLES[w.top]}`, w.topSlot, 'torso');
+      this.put(`hair.${HAIR_STYLES[w.hair]}`, w.hairSlot, 'hair');
+      if (w.bag) this.put('bag', w.bagSlot, 'bag');
+      this.put('hips', i, 'hips');
+      this.put('head', i, 'head');
+      this.put('face', i, 'face');
+      this.put('legs', i * 2, 'legL');
+      this.put('legs', i * 2 + 1, 'legR');
+      this.put('shoes', i * 2, 'shoeL');
+      this.put('shoes', i * 2 + 1, 'shoeR');
+      this.put('arms', i * 2, 'armL');
+      this.put('arms', i * 2 + 1, 'armR');
+      this.put('hands', i * 2, 'handL');
+      this.put('hands', i * 2 + 1, 'handR');
     });
     for (const m of Object.values(this.parts)) {
       m.instanceMatrix.needsUpdate = true;
@@ -333,6 +303,9 @@ export class Crowd implements GameSystem {
 
   dispose(): void {
     this.root.parent?.remove(this.root);
-    this.root.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
+    this.root.traverse((o) => {
+      const g = (o as THREE.Mesh).geometry;
+      if (g && !g.userData.shared) g.dispose();
+    });
   }
 }

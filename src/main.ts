@@ -56,7 +56,7 @@ async function main(): Promise<void> {
   ctx.events.emit('trainer:stats', { wins: trainer.wins, losses: trainer.losses });
   ctx.events.emit('player:health', { current: ctx.config.player.hp, max: ctx.config.player.hp });
   ctx.events.emit('player:stamina', { current: ctx.config.player.staminaMax, max: ctx.config.player.staminaMax });
-  ctx.events.emit('digivice:message', { text: `Bienvenido a Shibuya, ${trainer.name}. ¡Encuentra digimons salvajes!` });
+  ctx.events.emit('digivice:message', { text: `Welcome to Shibuya, ${trainer.name}. Go find wild Digimon!` });
 
   window.__game = { engine, ctx };
 }

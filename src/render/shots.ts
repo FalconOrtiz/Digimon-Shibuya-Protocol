@@ -55,7 +55,7 @@ function fixed(px: number, py: number, pz: number, tx: number, ty: number, tz: n
 
 export const SHOTS: Record<string, Shot> = {
   'golden-fps': {
-    label: 'GOLDEN 17:00 — FPS desde la cebra sur mirando al norte',
+    label: 'GOLDEN 17:00 — FPS from the south zebra looking north',
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 2, 16, 0.12, -0.06, 'fps');
@@ -63,7 +63,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'golden-trainer': {
-    label: 'GOLDEN 17:00 — tercera persona con partner',
+    label: 'GOLDEN 17:00 — third person with partner',
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 12, 0, -0.1, 'trainer');
@@ -71,7 +71,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'golden-top': {
-    label: 'GOLDEN 17:00 — vista aérea del cruce en X',
+    label: 'GOLDEN 17:00 — aerial view of the X crossing',
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 12, 0, 0, 'trainer');
@@ -79,7 +79,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'night-fps': {
-    label: 'NIGHT 21:30 — FPS desde la cebra sur mirando al norte',
+    label: 'NIGHT 21:30 — FPS from the south zebra looking north',
     apply(ctx) {
       setHour(ctx, NIGHT_HOUR);
       posePlayer(ctx, 2, 16, 0.12, -0.02, 'fps');
@@ -87,7 +87,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'night-trainer': {
-    label: 'NIGHT 21:30 — tercera persona con partner',
+    label: 'NIGHT 21:30 — third person with partner',
     apply(ctx) {
       setHour(ctx, NIGHT_HOUR);
       posePlayer(ctx, 0, 12, 0, -0.1, 'trainer');
@@ -95,7 +95,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'battle-golden': {
-    label: 'GOLDEN 17:00 — combate E33 en el cruce, menú',
+    label: 'GOLDEN 17:00 — E33 battle on the crossing, menu',
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 3, 12, 0.1, 0, 'trainer');
@@ -104,7 +104,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'battle-night': {
-    label: 'NIGHT 21:30 — combate E33 en el cruce, menú',
+    label: 'NIGHT 21:30 — E33 battle on the crossing, menu',
     apply(ctx) {
       setHour(ctx, NIGHT_HOUR);
       posePlayer(ctx, 3, 12, 0.1, 0, 'trainer');
@@ -113,7 +113,7 @@ export const SHOTS: Record<string, Shot> = {
     },
   },
   'partner-agumon': {
-    label: 'GOLDEN 17:00 — retrato de Agumon',
+    label: 'GOLDEN 17:00 — Agumon portrait',
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 14, 0, 0, 'fps');
@@ -123,8 +123,16 @@ export const SHOTS: Record<string, Shot> = {
       return fixed(1.4, 1.2, 9.2, 0, 0.75, 6, 38);
     },
   },
+  'people-closeup': {
+    label: 'GOLDEN 17:00 — trainer and crowd close-up',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 3, 12, Math.PI, 0, 'trainer');
+      return fixed(3.4, 1.05, 14.6, 3, 0.75, 12, 40);
+    },
+  },
   'partner-patamon': {
-    label: 'GOLDEN 17:00 — retrato de Patamon',
+    label: 'GOLDEN 17:00 — Patamon portrait',
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 14, 0, 0, 'fps');
@@ -132,6 +140,26 @@ export const SHOTS: Record<string, Shot> = {
       d?.showcase?.('patamon', new THREE.Vector3(0, 0, 6));
       showCrowd(ctx, false);
       return fixed(1.4, 1.5, 9.9, 0, 1.05, 6, 40);
+    },
+  },
+  'profile-agumon': {
+    label: 'GOLDEN 17:00 — Agumon side profile (model sheet check)',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 14, 0, 0, 'fps');
+      ctx.peek<any>('digimon')?.showcase?.('agumon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(3.6, 0.9, 6.2, 0, 0.7, 6, 36);
+    },
+  },
+  'profile-patamon': {
+    label: 'GOLDEN 17:00 — Patamon side profile (model sheet check)',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 14, 0, 0, 'fps');
+      ctx.peek<any>('digimon')?.showcase?.('patamon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(3.8, 1.2, 6.2, 0, 1.0, 6, 38);
     },
   },
 };

@@ -18,9 +18,9 @@ interface ItemDef {
 }
 
 const ITEMS: Record<string, ItemDef> = {
-  digipan: { name: 'DigiPan', desc: 'Pan energético. Recupera 30 HP.', icon: 'item-red-vial.jpg', heal: 30 },
-  potion: { name: 'Poción', desc: 'Líquido azul. Recupera 50 HP.', icon: 'item-cyan-vial.jpg', heal: 50 },
-  chip: { name: 'Chip de datos', desc: 'Fragmento de código digimon. Sirve para incubar.', icon: 'item-pistol.jpg' },
+  digipan: { name: 'DigiPan', desc: 'Energy bread. Restores 30 HP.', icon: 'item-red-vial.jpg', heal: 30 },
+  potion: { name: 'Potion', desc: 'Blue tonic. Restores 50 HP.', icon: 'item-cyan-vial.jpg', heal: 50 },
+  chip: { name: 'Data Chip', desc: 'A fragment of Digimon code. Used for incubation.', icon: 'item-pistol.jpg' },
 };
 const DEFAULT_ITEMS: Record<string, number> = { digipan: 3, potion: 1, chip: 2 };
 
@@ -29,11 +29,11 @@ const PORTRAIT: Record<string, string> = { agumon: '/assets/agumon-sprite.png', 
 
 type TabId = 'inventory' | 'map' | 'digimons' | 'profile' | 'eggs';
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'inventory', label: 'INVENTARIO' },
-  { id: 'map', label: 'MAPA' },
+  { id: 'inventory', label: 'ITEMS' },
+  { id: 'map', label: 'MAP' },
   { id: 'digimons', label: 'DIGIMONS' },
-  { id: 'profile', label: 'PERFIL' },
-  { id: 'eggs', label: 'HUEVOS' },
+  { id: 'profile', label: 'PROFILE' },
+  { id: 'eggs', label: 'EGGS' },
 ];
 
 interface EggRecord {
@@ -181,9 +181,24 @@ export class Digivice implements GameSystem {
     frame.appendChild(this.content);
     const footer = document.createElement('div');
     footer.className = 'dv-footer';
-    footer.textContent = 'ESC abrir/cerrar · ←→ pestañas · clic en un objeto para usarlo';
+    footer.textContent = 'ESC open/close · ←→ tabs · click an item to use it';
     frame.appendChild(footer);
-    this.root.appendChild(frame);
+
+    const device = document.createElement('div');
+    device.className = 'dv-device';
+    device.innerHTML = '<div class="dv-strap top"></div><div class="dv-strap bottom"></div><div class="dv-shell"><div class="dv-bezel"></div></div>';
+    device.querySelector('.dv-bezel')!.appendChild(frame);
+    const button = (cls: string, title: string, fn: () => void) => {
+      const b = document.createElement('button');
+      b.className = `dv-btn ${cls}`;
+      b.title = title;
+      b.addEventListener('click', fn);
+      device.appendChild(b);
+    };
+    button('blue', 'Close', () => this.close());
+    button('yellow', 'Previous tab', () => this.setTab(this.tab - 1));
+    button('green', 'Next tab', () => this.setTab(this.tab + 1));
+    this.root.appendChild(device);
     this.setTab(0, false);
   }
 
@@ -259,13 +274,13 @@ export class Digivice implements GameSystem {
     if (!def?.heal || !this.items[id]) return;
     const m = this.digimon.getActive();
     if (m.hp >= m.maxHp) {
-      this.toast(`${m.species.name} ya tiene la vida al máximo.`);
+      this.toast(`${m.species.name} is already at full health.`);
       return;
     }
     this.digimon.setHp(m, m.hp + def.heal);
     this.items[id]--;
     this.ctx.events.emit('inventory:changed', { item: id, count: this.items[id] });
-    this.toast(`${def.name}: ${m.species.name} recupera ${def.heal} HP.`);
+    this.toast(`${def.name}: ${m.species.name} restored ${def.heal} HP.`);
     this.render();
   }
 
@@ -408,16 +423,16 @@ export class Digivice implements GameSystem {
         <div class="dv-card-head">
           ${portrait ? `<img src="${portrait}" alt="" style="width:48px;height:48px;object-fit:contain">` : ''}
           <span class="dv-card-name" style="color:${hex(s.color)}">${esc(s.name)}</span>
-          <span class="dv-card-lv">NV.${m.level}</span>
+          <span class="dv-card-lv">LV.${m.level}</span>
         </div>
         <div class="dv-stat-grid">
           <span>HP</span><b>${m.hp}/${m.maxHp}</b>
           <span>ATK</span><b>${s.base.atk}</b>
           <span>DEF</span><b>${s.base.def}</b>
-          <span>VEL</span><b>${s.base.spe}</b>
+          <span>SPD</span><b>${s.base.spe}</b>
         </div>
         <div class="dv-bar"><div class="dv-bar-fill" style="width:${Math.round((m.hp / Math.max(1, m.maxHp)) * 100)}%"></div></div>
-        <div class="dv-friendship">Amistad: ${'♥'.repeat(hearts)}${'♡'.repeat(5 - hearts)}</div>
+        <div class="dv-friendship">Friendship: ${'♥'.repeat(hearts)}${'♡'.repeat(5 - hearts)}</div>
         <div class="dv-card-desc">${esc(s.description)}</div>`;
       list.appendChild(card);
     }
@@ -433,15 +448,15 @@ export class Digivice implements GameSystem {
       <div class="dv-profile-avatar">${esc(t.name.charAt(0).toUpperCase())}</div>
       <div class="dv-profile-info">
         <div class="dv-card-name">${esc(t.name)}</div>
-        <div class="dv-wl">Victorias: <b>${t.wins}</b> · Derrotas: <b>${t.losses}</b></div>
-        <div class="dv-wl">Vida ${Math.round(this.player.hp)}/${cfg.hp} · Energía ${Math.round(this.player.stamina)}/${cfg.staminaMax}</div>
+        <div class="dv-wl">Wins: <b>${t.wins}</b> · Losses: <b>${t.losses}</b></div>
+        <div class="dv-wl">Health ${Math.round(this.player.hp)}/${cfg.hp} · Energy ${Math.round(this.player.stamina)}/${cfg.staminaMax}</div>
       </div>`;
     el.appendChild(card);
     const badges = document.createElement('div');
     badges.className = 'dv-badges';
     badges.innerHTML = t.badges.length
       ? t.badges.map((b) => `<span class="dv-badge">${esc(b)}</span>`).join('')
-      : '<div class="dv-empty">Sin insignias aún. Derrota trainers para ganarlas.</div>';
+      : '<div class="dv-empty">No badges yet. Defeat trainers to earn them.</div>';
     el.appendChild(badges);
   }
 
@@ -464,7 +479,7 @@ export class Digivice implements GameSystem {
     for (const e of hatched) {
       this.digimon.addToParty(e.species, 3);
       this.ctx.events.emit('egg:hatch', { digimon: e.species, name: e.name });
-      this.toast(`¡El digihuevo eclosionó: ${e.name} se une al equipo!`);
+      this.toast(`The DigiEgg hatched: ${e.name} joined your team!`);
     }
     this.eggs = this.eggs.filter((e) => e.secondsPlayed < e.hatchInSeconds);
     this.trainer.setEggs(this.eggs);
@@ -472,7 +487,7 @@ export class Digivice implements GameSystem {
 
   private renderEggs(el: HTMLElement): void {
     if (!this.eggs.length) {
-      el.innerHTML = '<div class="dv-empty">Sin digihuevos. Explora Shibuya y busca huevos brillantes.</div>';
+      el.innerHTML = '<div class="dv-empty">No DigiEggs. Explore Shibuya and look for glowing eggs.</div>';
       return;
     }
     const list = document.createElement('div');
