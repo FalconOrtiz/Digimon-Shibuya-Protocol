@@ -3,11 +3,10 @@
 import { createEngine } from './core/Engine';
 import { RenderSystem } from './render/RenderSystem';
 import { Atmosphere } from './world/Atmosphere';
-import { Shibuya } from './world/shibuya.js';
-import { Buildings } from './world/buildings.js';
-import { Props } from './world/props.js';
-import { StreetLife } from './world/street-life.js';
-import { Npcs } from './world/npcs.js';
+import { Crossing } from './world/Crossing';
+import { CityBlocks } from './world/CityBlocks';
+import { UrbanProps } from './world/UrbanProps';
+import { Crowd } from './world/Crowd';
 import { Encounters } from './world/encounters.js';
 import { Player } from './player/controller.js';
 import { DigimonSystem } from './digimon/index.js';
@@ -30,11 +29,10 @@ async function main(): Promise<void> {
 
   engine.register(new RenderSystem());
   engine.register(new Atmosphere());
-  engine.register(new Shibuya());
-  engine.register(new Buildings());
-  engine.register(new Props());
-  engine.register(new StreetLife());
-  engine.register(new Npcs());
+  engine.register(new Crossing());
+  engine.register(new CityBlocks());
+  engine.register(new UrbanProps());
+  engine.register(new Crowd());
   engine.register(new Player());
   engine.register(new DigimonSystem());
   engine.register(new TrainerProfile());

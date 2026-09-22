@@ -711,9 +711,9 @@ export function wetAsphaltMaps(size = 512): MaterialMaps {
     const grain = tileableFbm(NOISE.stone, u, v, 90, 2);
     const w = worley(u, v, 110, 5);
     const pebble = smoothstep(0.42, 0.12, w.f1) * 0.8;
-    const crackCell = worley(u, v, 5, 17);
-    const crackMask = smoothstep(0.1, 0.35, tileableFbm(NOISE.paint, u, v, 4, 2));
-    const crack = smoothstep(0.035, 0.0, crackCell.f2 - crackCell.f1) * crackMask;
+    const crackCell = worley(u, v, 3, 17);
+    const crackMask = smoothstep(0.32, 0.52, tileableFbm(NOISE.paint, u, v, 4, 2));
+    const crack = smoothstep(0.018, 0.0, crackCell.f2 - crackCell.f1) * crackMask;
     const puddle = smoothstep(0.2, 0.34, patch + tone * 0.18);
     const damp = smoothstep(-0.15, 0.2, patch);
 
@@ -721,7 +721,7 @@ export function wetAsphaltMaps(size = 512): MaterialMaps {
     setRgb(o, dry, 0.9 + t * 0.2);
     mixInto(o, wet, damp * 0.75);
     mixInto(o, stone, pebble * (1 - puddle) * 0.35);
-    mixInto(o, tar, crack * 0.85);
+    mixInto(o, tar, crack * 0.6);
     mixInto(o, wet, puddle * 0.5);
 
     o.h = puddle > 0.5 ? 0.42 : 0.5 + grain * 0.12 + pebble * 0.18 - crack * 0.35;

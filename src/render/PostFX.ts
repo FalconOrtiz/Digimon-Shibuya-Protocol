@@ -174,11 +174,11 @@ interface LookPreset {
 }
 
 const LOOK_GOLDEN: LookPreset = {
-  exposure: 1.08,
-  contrast: 1.06,
-  saturation: 1.12,
-  lift: [0.02, 0.025, 0.05],
-  gain: [1.06, 1.0, 0.92],
+  exposure: 1.16,
+  contrast: 1.05,
+  saturation: 1.2,
+  lift: [0.04, 0.025, 0.03],
+  gain: [1.1, 1.0, 0.88],
   vignette: 0.3,
   bloomStrength: 0.35,
   bloomRadius: 0.6,
@@ -186,15 +186,15 @@ const LOOK_GOLDEN: LookPreset = {
 };
 
 const LOOK_NIGHT: LookPreset = {
-  exposure: 1.12,
+  exposure: 1.28,
   contrast: 1.1,
   saturation: 1.15,
   lift: [0.03, 0.02, 0.07],
   gain: [1.0, 0.98, 1.04],
-  vignette: 0.4,
-  bloomStrength: 0.75,
-  bloomRadius: 0.72,
-  bloomThreshold: 1.0,
+  vignette: 0.3,
+  bloomStrength: 0.6,
+  bloomRadius: 0.62,
+  bloomThreshold: 1.1,
 };
 
 const GradeShader = {

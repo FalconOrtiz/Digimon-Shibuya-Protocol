@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { bakeCavityAO } from '../fx/Sculpt';
-import { makeEye } from '../fx/CreatureMaterials';
+import { makeEye } from '../fx/materials/CreatureMaterials';
 import { makeRng, clamp } from '../core/Noise';
 
 /**

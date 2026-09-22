@@ -4,7 +4,7 @@
 
 import * as THREE from 'three';
 import { roundedBox } from '../fx/Sculpt';
-import { creatureSkin, makeEye } from '../fx/CreatureMaterials';
+import { creatureSkin, makeEye } from '../fx/materials/CreatureMaterials';
 
 export class Player {
   static id = 'player';
@@ -231,7 +231,8 @@ export class Player {
     const feetY = this.pos.y - this.height;
     if (this.mesh) {
       this.mesh.position.set(this.pos.x, feetY, this.pos.z);
-      this.mesh.rotation.y = this.yaw;
+      // The model is sculpted facing +Z; the player walks towards -Z (camera forward).
+      this.mesh.rotation.y = this.yaw + Math.PI;
       const parts = this.mesh.userData.parts;
       const moving = Math.abs(this.vel.x) + Math.abs(this.vel.z) > 0.4;
       if (parts) {

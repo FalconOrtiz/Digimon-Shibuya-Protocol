@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { bakeColorMap, bakeNormalMap, bakeScalarMap, cached, mixHex, NOISE } from '../core/TextureLab';
-import { tileableFbm, worley, clamp, smoothstep } from '../core/Noise';
+import { bakeColorMap, bakeNormalMap, bakeScalarMap, cached, mixHex, NOISE } from '../../core/TextureLab';
+import { tileableFbm, worley, clamp, smoothstep } from '../../core/Noise';
 
 /**
  * Materials for the Digimon creatures.

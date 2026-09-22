@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { metaSurface, boxProjectedUV, type Ball } from '../fx/Sculpt';
-import { creatureSkin } from '../fx/CreatureMaterials';
+import { creatureSkin } from '../fx/materials/CreatureMaterials';
 import { makeRng, lerp, clamp } from '../core/Noise';
 import { createRig, IdleAnimator, disposeCreature, type Creature } from './shared';
 import { fixOutward, weldDecimate, markSculpt, ramp, buildEye, clawGeometry, type MarkField } from './sculpt-util';

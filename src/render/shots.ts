@@ -64,7 +64,7 @@ export const SHOTS: Record<string, Shot> = {
     apply(ctx) {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 12, 0, 0, 'trainer');
-      return fixed(34, 62, 58, 0, 0, -4, 55);
+      return fixed(0, 88, 78, 0, 0, -8, 50);
     },
   },
   'night-fps': {

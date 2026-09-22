@@ -18,7 +18,7 @@ import type { Ctx, GameSystem } from '../core/Context';
 const SUN_MAX_ELEVATION = THREE.MathUtils.degToRad(56);
 /** Measured from +Z (south) turning toward +X. West-south-west at dusk, so the
  * north-facing gold camera sees lit facades with shadows raking toward it. */
-const SUN_AZIMUTH = THREE.MathUtils.degToRad(-58);
+const SUN_AZIMUTH = THREE.MathUtils.degToRad(200);
 const MOON_DIR = new THREE.Vector3(0.45, 0.72, -0.52).normalize();
 
 /** Area the key light must resolve: crossing plus first ring of blocks. */
@@ -52,11 +52,11 @@ const DAY_PHASES: DayPhase[] = [
   { hour: 13, zenith: 0x4a6ab0, horizon: 0xb8cce8, haze: 0xc8d8ec, nadir: 0x5a6478, sun: 0xfff8d8, sunIntensity: 2.9, hemiSky: 0xa8b8d4, hemiGround: 0x5a5a60, hemiIntensity: 1.0, fog: 0x9aa8c0, fogDensity: 0.0015, env: 1.0 },
   { hour: 15.5, zenith: 0x5a78c0, horizon: 0xf0d0b0, haze: 0xffe0c0, nadir: 0x6a6070, sun: 0xffe8c0, sunIntensity: 2.7, hemiSky: 0xb8b8d8, hemiGround: 0x6a6060, hemiIntensity: 1.0, fog: 0xb8a8b0, fogDensity: 0.0016, env: 1.0 },
   // GOLDEN gold shot
-  { hour: 17, zenith: 0x6a7ab8, horizon: 0xffc890, haze: 0xffd8a8, nadir: 0x6a5a70, sun: 0xffc080, sunIntensity: 2.5, hemiSky: 0xc8b4d4, hemiGround: 0x7a6a62, hemiIntensity: 1.05, fog: 0xd8b8a8, fogDensity: 0.0017, env: 1.0 },
+  { hour: 17, zenith: 0x7a86c8, horizon: 0xffc890, haze: 0xffdcb0, nadir: 0x7a6070, sun: 0xffc488, sunIntensity: 2.6, hemiSky: 0xf0c8c8, hemiGround: 0x9a7466, hemiIntensity: 1.25, fog: 0xf0c8a8, fogDensity: 0.0016, env: 1.15 },
   { hour: 18.6, zenith: 0x3d2a6b, horizon: 0xff9868, haze: 0xffb080, nadir: 0x4a3a5e, sun: 0xff9860, sunIntensity: 1.2, hemiSky: 0x9a80b0, hemiGround: 0x3a3448, hemiIntensity: 0.8, fog: 0x6a4a6a, fogDensity: 0.0024, env: 0.85 },
   { hour: 19.6, zenith: 0x1e1e48, horizon: 0x6a5a90, haze: 0x7a6a98, nadir: 0x22223e, sun: 0x8898d0, sunIntensity: 0.4, hemiSky: 0x5a5a88, hemiGround: 0x22222e, hemiIntensity: 0.6, fog: 0x2e2a4a, fogDensity: 0.0026, env: 0.65 },
   // NIGHT gold shot
-  { hour: 21.5, zenith: 0x121430, horizon: 0x34366a, haze: 0x444478, nadir: 0x14142a, sun: 0x8898d0, sunIntensity: 0.3, hemiSky: 0x44447a, hemiGround: 0x1c1c2c, hemiIntensity: 0.55, fog: 0x1e1e38, fogDensity: 0.0027, env: 0.55 },
+  { hour: 21.5, zenith: 0x121430, horizon: 0x3a3470, haze: 0x4a4080, nadir: 0x14142a, sun: 0xa0b0ff, sunIntensity: 0.5, hemiSky: 0x7060b0, hemiGround: 0x6a3a5a, hemiIntensity: 1.35, fog: 0x241a3a, fogDensity: 0.0022, env: 0.8 },
 ];
 
 export class Atmosphere implements GameSystem {
@@ -87,6 +87,7 @@ export class Atmosphere implements GameSystem {
   private envScene!: THREE.Scene;
   private envMat!: THREE.ShaderMaterial;
   private pmrem!: THREE.PMREMGenerator;
+  private cityGlow!: THREE.Mesh;
   private lastPhase = '';
 
   init(ctx: Ctx): this {
@@ -145,6 +146,8 @@ export class Atmosphere implements GameSystem {
     const envMesh = new THREE.Mesh(new THREE.IcosahedronGeometry(12, 4), this.envMat);
     envMesh.frustumCulled = false;
     this.envScene.add(envMesh);
+    this.cityGlow = cityGlowRing(ctx.config.seed);
+    this.envScene.add(this.cityGlow);
     this.pmrem = new THREE.PMREMGenerator(ctx.renderer);
 
     const self = this;
@@ -216,8 +219,8 @@ export class Atmosphere implements GameSystem {
     col(this.fill.groundColor, a.hemiGround, b.hemiGround);
     this.fill.intensity = num(a.hemiIntensity, b.hemiIntensity);
 
-    this.bounce.color.setHex(0xffd9a8).lerp(this.cA.setHex(0x6a78c8), nf);
-    this.bounce.intensity = 0.22 + (1 - nf) * 0.12;
+    this.bounce.color.setHex(0xffd9a8).lerp(this.cA.setHex(0xc05a9a), nf);
+    this.bounce.intensity = 0.22 + (1 - nf) * 0.12 + nf * 0.2;
 
     col(this.fog.color, a.fog, b.fog);
     this.fog.density = num(a.fogDensity, b.fogDensity);
@@ -244,6 +247,8 @@ export class Atmosphere implements GameSystem {
   }
 
   private rebuildEnvironment(): void {
+    const glow = this.cityGlow.material as THREE.MeshBasicMaterial;
+    glow.color.setScalar(0.08 + this.nightFactor * 3);
     const next = this.pmrem.fromScene(this.envScene, 0.035, 0.5, 60);
     this.ctx.scene.environment = next.texture;
     this.envTarget?.dispose();
@@ -304,10 +309,64 @@ export class Atmosphere implements GameSystem {
     this.clouds.mesh.geometry.dispose();
     this.clouds.material.dispose();
     this.envMat.dispose();
+    this.cityGlow.geometry.dispose();
+    const glow = this.cityGlow.material as THREE.MeshBasicMaterial;
+    glow.map?.dispose();
+    glow.dispose();
     this.envTarget?.dispose();
     this.pmrem.dispose();
     this.key.shadow.map?.dispose();
   }
+}
+
+/**
+ * Reflection-only skyline band for the PMREM scene: dark tower silhouettes
+ * dotted with lit windows and neon bars. By day it is nearly black (a hint of
+ * city on the horizon); at night it is what wet asphalt and glass reflect.
+ */
+function cityGlowRing(seed: number): THREE.Mesh {
+  const W = 1024;
+  const H = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const g = canvas.getContext('2d')!;
+  let s = seed * 9301 + 49297;
+  const rnd = () => ((s = (s * 9301 + 49297) % 233280) / 233280);
+  g.fillStyle = '#000';
+  g.fillRect(0, 0, W, H);
+  const neon = ['#ff3d8a', '#4de1ff', '#ffd23d', '#b06bff', '#ff7a2e', '#7cff6b'];
+  for (let x = 0; x < W; ) {
+    const bw = 14 + rnd() * 40;
+    const top = H * (0.15 + rnd() * 0.5);
+    g.fillStyle = '#0b0a14';
+    g.fillRect(x, top, bw, H - top);
+    for (let wy = top + 4; wy < H - 4; wy += 6) {
+      for (let wx = x + 3; wx < x + bw - 3; wx += 5) {
+        if (rnd() < 0.55) {
+          g.fillStyle = rnd() < 0.75 ? '#ffc890' : '#9ad8ff';
+          g.globalAlpha = 0.55 + rnd() * 0.45;
+          g.fillRect(wx, wy, 2, 3);
+        }
+      }
+    }
+    g.globalAlpha = 1;
+    if (rnd() < 0.8) {
+      g.fillStyle = neon[Math.floor(rnd() * neon.length)];
+      if (rnd() < 0.5) g.fillRect(x + bw * 0.3, top + 6, 6, (H - top) * 0.7);
+      else g.fillRect(x + 2, top + 8 + rnd() * 20, bw - 4, 10);
+    }
+    x += bw + rnd() * 3;
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.repeat.x = 3;
+  const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(11, 11, 3.2, 96, 1, true), mat);
+  ring.position.y = 1.3;
+  ring.frustumCulled = false;
+  return ring;
 }
 
 const _m = new THREE.Matrix4();
