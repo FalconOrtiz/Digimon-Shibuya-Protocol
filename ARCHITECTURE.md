@@ -1,82 +1,102 @@
 # DIGIMON: SHIBUYA PROTOCOL — engine contract
 
-**Cada agente debe leer esto antes de escribir código. Es el único mecanismo de coordinación.**
+**Cada agente debe leer esto y `ART_DIRECTION.md` antes de escribir código.**
 
-Target: fan game FPS en el cruce de Shibuya (Three.js r180+ / WebGL2), combate por
-turnos estilo Expedition 33 (QTE timing, parry/dodge), digimons chibi procedurales.
-Sin assets externos: texturas, mallas, animación y audio generados proceduralmente
-en tiempo de carga. Única dependencia runtime: `three`.
+Fan game en el cruce de Shibuya (Three.js r185 / WebGL2, TypeScript), combate por turnos
+estilo Expedition 33 y digimons esculpidos con SDF. El motor visual es el de Paulius
+(fork `pallet-town-3d`, `D:\Digimon\game`): TextureLab procedural, Sculpt SDF, PostFX HDR.
+El contrato de subsistemas es el de Claude-of-Duty.
 
 ## Hard rules
 
 1. **Eres dueño de tu directorio. Nunca edites fuera de él.**
-2. **Nunca importes el módulo de otro subsistema.** Obténlo en runtime:
-   `const battle = ctx.get('battle')`. Esto hace seguro el trabajo paralelo.
-3. **Sin dependencias npm nuevas.** Solo `three`. Sin CDN, sin imágenes/modelos/
-   audio externos — el juego debe correr offline.
-4. **Sin `Math.random()` en gameplay/visuales.** Usa `ctx.rng` (src/core/rng.js)
-   o `ctx.rng.fork()`. La reproducibilidad de capturas depende de esto.
+2. **Nunca importes el módulo de otro subsistema.** Obténlo en runtime con
+   `ctx.get('battle')`. Las librerías compartidas (`core/`, `fx/`) sí se importan.
+3. **Sin dependencias npm nuevas en runtime.** Solo `three`.
+4. **Sin `Math.random()` en gameplay/visuales.** Usa `ctx.rng` / `ctx.rng.fork()` o
+   `makeRng(seed)` de `core/Noise.ts`.
 5. **Cero alloc por frame.** Preasigna en `init()` y reutiliza.
 6. **Dispose** de geometrías, materiales, texturas y render targets en `dispose()`.
-7. `npm run build` debe pasar y `node tools/capture.mjs` debe producir un frame.
+7. **Verde antes de commit:** `npm run check`, `npm test`, `npm run build`, y
+   `node tools/visual-gate.mjs` para cualquier cambio visual.
+8. **Código nuevo en TypeScript.** Los subsistemas de gameplay que siguen en JS
+   (`battle/`, `digivice/`, `ui/`, `audio/`, `trainer/`, `player/`) compilan vía
+   `allowJs`; al reescribir uno, pásalo a `.ts`.
 
-## Subsistema interface
+## Interfaz de subsistema
 
-```js
-export class MySystem {
+```ts
+export class MySystem implements GameSystem {
   static id = 'mysystem';
   static deps = ['render'];
-  async init(ctx) {}
-  fixedUpdate(h, ctx) {}   // 120 Hz determinista
-  update(dt, ctx) {}       // por frame
-  lateUpdate(dt, ctx) {}
-  resize(w, h, ctx) {}
-  dispose() {}
+  async init(ctx: Ctx) {}
+  fixedUpdate?(h: number, ctx: Ctx) {}   // 120 Hz determinista
+  update?(dt: number, ctx: Ctx) {}       // por frame
+  lateUpdate?(dt: number, ctx: Ctx) {}
+  resize?(w: number, h: number, ctx: Ctx) {}
+  dispose?() {}
 }
 ```
 
-`ctx`: `scene`, `camera`, `canvas`, `config`, `events`, `input`, `time`,
-`rng`, `get(id)`, `peek(id)`, `has(id)`.
+`ctx` (`src/core/Context.ts`): `scene`, `camera`, `renderer`, `canvas`, `config`,
+`events`, `input`, `time`, `rng`, `get(id)`, `peek(id)`, `has(id)`.
+
+`Engine.boot()` inicializa los sistemas en **orden topológico** de `deps`; una
+dependencia desconocida o un ciclo es un error de arranque.
 
 ## Ownership map
 
 | id | dir | owns |
 |---|---|---|
-| render | src/render/ | WebGLRenderer, pipeline, post, composite (si se separa; MVP: en engine) |
-| world | src/world/ | Shibuya: cruce, calles, manzanas, edificios, neones, props, NPCs, día/noche |
-| player | src/player/ | controller FPS, cámara, stamina, colisiones AABB |
-| digimon | src/digimon/ | modelos chibi procedurales (Agumon/Patamon), anims, registry, moves |
-| battle | src/battle/ | máquina de turnos, QTE, arena, IA enemiga |
-| trainer | src/trainer/ | perfil del trainer, rival |
-| digivice | src/digivice/ | UI Digivice: inventario, mapa, digimons, perfil, huevos, stamina |
-| ui | src/ui/ | HUD DOM/CSS, crosshair, barras, prompts, pantallas |
-| audio | src/audio/ | síntesis Web Audio |
+| — (lead) | `src/core/` | Engine, Context, Events, Rng, Input, Config, Noise, TextureLab |
+| render | `src/render/` | PostFX (GTAO, Bloom, Grade ACES, SMAA), `sceneStats`, captura |
+| — (lead) | `src/fx/` | Sculpt, SkyShader, Clouds, `materials/*` (dominios de material) |
+| atmosphere | `src/world/Atmosphere.ts` | **Único dueño de luces**, cielo, nubes, PMREM, niebla, reloj día/noche |
+| world | `src/world/` | Cruce, CityBlocks/FacadeKit, UrbanProps, Crowd, StreetLife, Collision, Encounters |
+| player | `src/player/` | Controller FPS/tercera persona, stamina, colisiones |
+| digimon | `src/digimon/` | Modelos SDF (Agumon, Patamon, Champion, Ultimate), animación, registro |
+| battle | `src/battle/` | Motor E33 puro, director de turnos, QTE/ventanas, arena, chips |
+| trainer | `src/trainer/` | Perfil, guardado local |
+| digivice | `src/digivice/` | UI Digivice: inventario, mapa, digimons, perfil, huevos |
+| ui | `src/ui/` | HUD DOM/CSS |
+| audio | `src/audio/` | Síntesis Web Audio |
 
-Compartido (del lead, no editar): `src/core/`, `src/main.js`, `tools/`, `vite.config.js`.
+`tools/` y `src/main.ts` son del lead.
+
+## Pipeline visual
+
+```
+Noise.ts ──► TextureLab (*Maps: albedo+normal+roughness, cached) ──► fx/materials/*
+                                                                        │
+Sculpt (roundedBox, metaSurface) ──► world/* , digimon/* ◄──────────────┘
+                                          │
+Atmosphere (luces, PMREM, nightFactor) ──►scene──► render/PostFX ──► pantalla
+```
 
 ## Eventos canónicos
 
 | evento | payload | emisor |
 |---|---|---|
-| `battle:start` | `{ wild, trainer }` | world/player |
+| `battle:request` | `{ enemySpecies, enemyLevel, trainerName?, rival? }` | encounters |
+| `battle:start` | `{ enemy, trainer, rival, ap, apMax, gradient, break }` | battle |
 | `battle:end` | `{ result: 'win'\|'lose'\|'fled' }` | battle |
-| `battle:turn` | `{ actor, action }` | battle |
-| `battle:qte` | `{ type: 'crit'\|'parry'\|'dodge', window, success }` | battle |
+| `battle:turn` | `{ actor, action, phase }` | battle |
+| `battle:qte` | `{ type, window, success }` | battle |
 | `battle:hit` | `{ target, damage, crit, blocked }` | battle |
-| `digimon:damage` | `{ digimon, amount, hp }` | battle |
-| `digimon:heal` | `{ digimon, amount, hp }` | battle/digivice |
+| `battle:e33` | `{ ap, apMax, gradient, break, broken }` | battle |
+| `digimon:damage` / `digimon:heal` | `{ digimon, amount, hp }` | battle/digivice |
 | `digimon:digivolve` | `{ from, to }` | battle |
-| `player:stamina` | `{ current, max }` | player |
-| `player:health` | `{ current, max }` | player |
-| `digivice:open` / `digivice:close` | `{}` | digivice |
-| `digivice:tab` | `{ tab }` | digivice |
+| `player:stamina` / `player:health` | `{ current, max }` | player |
+| `digivice:open` / `digivice:close` / `digivice:tab` | `{}` / `{ tab }` | digivice |
 | `inventory:changed` | `{ item, count }` | digivice |
 | `egg:hatch` | `{ digimon }` | digivice |
-| `world:time` | `{ hour, dayPhase }` | world |
-| `interact` | `{ target }` | player |
-| `encounter` | `{ digimon, at }` | world |
+| `world:time` | `{ hour, dayPhase, nightFactor }` | atmosphere |
+| `save:loaded` / `save:written` | `{ data }` | trainer |
+| `interact` | `{ from }` | player |
+| `encounter` | `{ digimon, at }` | encounters |
+| `mode` | `{ mode: 'explore'\|'battle' }` | battle |
 
-Si necesitas un evento nuevo, añade fila aquí en el mismo commit.
+Si necesitas un evento nuevo, añade la fila aquí en el mismo commit.
 
 ## Stats / balance
 
@@ -85,18 +105,11 @@ Si necesitas un evento nuevo, añade fila aquí en el mismo commit.
 | Agumon | 90 | 12 | 8 | 10 |
 | Patamon | 75 | 9 | 7 | 14 |
 
-Moves: Baby Flame (fuego 18), Peppers Breath (fuego 26, carga 1 turno);
-Boom Bubble (aire 16), Air Shot (aire 22).
-QTE: crit 1.6×, parry 0 daño + contra 0.5×, dodge 0 daño.
-Stamina: sprint 30/s, regen 15/s. HP trainer 100.
+Motor E33 (`src/battle/engine/`): AP 0–9, básicos +2 AP, skills cuestan AP y suben el
+Gradient; ventanas dodge 0.45 s / parry 0.18 s; parry perfecto → contra 0.5×;
+DATA BREAK 100 → aturdido 2 turnos y ×1.5; Gradient 50 → Champion, 100 → Ultimate/ULT.
 
 ## Quality bar
 
-- Sin superficies planas/sin textura: variación de albedo + normal + roughness +
-  detail layer.
-- Sin iluminación uniforme: contact shadows, AO, key/fill/rim.
-- Valores físicamente plausibles: albedo 0.02–0.9, intensidades realistas.
-- Nada perfectamente recto/limpio/repetido: edge wear, grime, warp sutil, variación
-  de instancias.
-- Cada acción tiene peso: recoil, shake, transiente de audio, FX.
-- Los digimons deben ser reconocibles como Agumon/Patamon (silueta + color + rasgos).
+Ver `ART_DIRECTION.md` §10. Presupuesto: ≤ 300 draw calls, ≤ 2.5 M triángulos, 60 fps a
+1600×900 en `high`.
