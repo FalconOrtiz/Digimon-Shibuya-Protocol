@@ -38,7 +38,7 @@ export class Buildings {
     this._buildAll();
     if (ctx.events) {
       ctx.events.on('world:time', () => {
-        const nf = ctx.peek('daynight')?.nightFactor ?? 0.5;
+        const nf = ctx.scene.userData.nightFactor ?? 0;
         for (const m of this.windowMats) m.emissiveIntensity = 0.12 + 0.55 * nf;
       });
     }
