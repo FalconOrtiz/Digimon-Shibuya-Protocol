@@ -7,14 +7,14 @@ import { Crossing } from './world/Crossing';
 import { CityBlocks } from './world/CityBlocks';
 import { UrbanProps } from './world/UrbanProps';
 import { Crowd } from './world/Crowd';
-import { Encounters } from './world/encounters.js';
-import { Player } from './player/controller.js';
+import { Encounters } from './world/Encounters';
+import { Player } from './player/Player';
 import { DigimonSystem } from './digimon';
-import { Battle } from './battle/index.js';
-import { TrainerProfile } from './trainer/profile.js';
-import { Digivice } from './digivice/index.js';
-import { Hud } from './ui/hud.js';
-import { AudioSystem } from './audio/index.js';
+import { BattleSystem } from './battle/BattleSystem';
+import { TrainerProfile } from './trainer/TrainerProfile';
+import { Digivice } from './digivice/Digivice';
+import { Hud } from './ui/Hud';
+import { AudioSystem } from './audio/AudioSystem';
 
 declare global {
   interface Window {
@@ -33,10 +33,11 @@ async function main(): Promise<void> {
   engine.register(new CityBlocks());
   engine.register(new UrbanProps());
   engine.register(new Crowd());
+  engine.register(new TrainerProfile());
   engine.register(new Player());
   engine.register(new DigimonSystem());
-  engine.register(new TrainerProfile());
-  engine.register(new Battle());
+  // Después de `player`: en combate su escritura de cámara es la última.
+  engine.register(new BattleSystem());
   engine.register(new Encounters());
   engine.register(new AudioSystem());
   engine.register(new Hud());
@@ -44,23 +45,18 @@ async function main(): Promise<void> {
 
   await engine.boot();
 
-  const trainer = ctx.get<any>('trainer');
-  const digimonSys = ctx.get<any>('digimon');
-  const digivice = ctx.get<any>('digivice');
-
-  trainer.setTeam(digimonSys.party.map((m: any) => m.species.id));
-  trainer.name = 'FalconOrtiz';
-  ctx.events.emit('trainer:stats', { wins: 0, losses: 0 });
-  ctx.events.emit('egg:found', { species: 'koromon' });
+  const trainer = ctx.get<{ name: string; wins: number; losses: number; savedEggs(): unknown[] }>('trainer');
+  const digivice = ctx.get<{ open: boolean }>('digivice');
+  const battle = ctx.get<{ running: boolean }>('battle');
 
   canvas.addEventListener('click', () => {
-    const battle = ctx.peek<any>('battle');
-    if (!ctx.input.locked && !digivice.open && !(battle && battle.running)) ctx.input.lock();
+    if (!ctx.input.locked && !digivice.open && !battle.running) ctx.input.lock();
   });
 
+  ctx.events.emit('trainer:stats', { wins: trainer.wins, losses: trainer.losses });
   ctx.events.emit('player:health', { current: ctx.config.player.hp, max: ctx.config.player.hp });
   ctx.events.emit('player:stamina', { current: ctx.config.player.staminaMax, max: ctx.config.player.staminaMax });
-  ctx.events.emit('digivice:message', { text: 'Bienvenido a Shibuya, FalconOrtiz. ¡Encuentra digimons salvajes!' });
+  ctx.events.emit('digivice:message', { text: `Bienvenido a Shibuya, ${trainer.name}. ¡Encuentra digimons salvajes!` });
 
   window.__game = { engine, ctx };
 }

@@ -3,7 +3,7 @@ import type { FacadeSpec } from '../fx/materials/BuildingMaterials';
 import { updateScreens, ledScreenMaterial } from '../fx/materials/NeonMaterials';
 import type { Ctx, GameSystem } from '../core/Context';
 import type { Rng } from '../core/Rng';
-import { LAYOUT } from './Layout';
+import { LAYOUT } from '../core/Layout';
 import { MergeBin, type Collider } from './geom';
 import { buildTower, buildRoundTower, buildMass, type KitBins, type SignSpec, type TowerSpec } from './FacadeKit';
 

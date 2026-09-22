@@ -4,7 +4,7 @@ import { roundedBox, metaSurface, bakeCavityAO, type Ball } from '../fx/Sculpt';
 import { creatureSkin } from '../fx/materials/CreatureMaterials';
 import type { Ctx, GameSystem } from '../core/Context';
 import type { Rng } from '../core/Rng';
-import { LAYOUT, groundHeightAt } from './Layout';
+import { LAYOUT, groundHeightAt } from '../core/Layout';
 
 /**
  * The scramble crowd: chibi pedestrians (head ≈ 1/3.5 of the body, as in the
@@ -98,7 +98,31 @@ export class Crowd implements GameSystem {
     for (let i = 0; i < n; i++) this.people.push(this.spawn(i < n * 0.6));
     this.build(n);
     this.write();
+    ctx.events.on('battle:stage', (p: { center: { x: number; z: number }; radius: number }) => {
+      this.keepOut = { x: p.center.x, z: p.center.z, r: p.radius };
+    });
+    ctx.events.on('battle:end', () => {
+      this.keepOut = null;
+    });
     return this;
+  }
+
+  /** Disco que la multitud rodea (la arena de combate). */
+  private keepOut: { x: number; z: number; r: number } | null = null;
+
+  /** Saca al peatón al borde del disco; así rodea la arena en vez de cruzarla. */
+  private avoid(w: Walker): void {
+    const k = this.keepOut;
+    if (!k) return;
+    const dx = w.x - k.x;
+    const dz = w.z - k.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= k.r) return;
+    const s = d > 1e-3 ? k.r / d : 1;
+    w.x = k.x + (d > 1e-3 ? dx : k.r) * s;
+    w.z = k.z + (d > 1e-3 ? dz : 0) * s;
+    // Destino dentro del disco: nunca llegaría, así que se elige otro.
+    if (Math.hypot(w.tx - k.x, w.tz - k.z) < k.r) this.retarget(w);
   }
 
   private spawn(cross: boolean): Walker {
@@ -234,9 +258,12 @@ export class Crowd implements GameSystem {
         continue;
       }
       const step = Math.min(d, w.speed * dt);
+      const px = w.x;
+      const pz = w.z;
       w.x += (dx / d) * step;
       w.z += (dz / d) * step;
-      const yaw = Math.atan2(dx, dz);
+      this.avoid(w);
+      const yaw = Math.atan2(w.x - px || dx, w.z - pz || dz);
       let dy = yaw - w.yaw;
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       w.yaw += dy * Math.min(1, dt * 6);

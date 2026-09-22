@@ -9,7 +9,7 @@ import {
   tactileMaterial,
   TILE,
 } from '../fx/materials/TerrainMaterials';
-import { LAYOUT, groundHeightAt } from './Layout';
+import { LAYOUT, groundHeightAt } from '../core/Layout';
 import { MergeBin, place, groundUV, facadeUV, flatQuad } from './geom';
 import type { Ctx, GameSystem } from '../core/Context';
 

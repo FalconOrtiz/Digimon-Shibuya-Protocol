@@ -15,7 +15,7 @@ import {
 } from '../fx/materials/PropMaterials';
 import type { Ctx, GameSystem } from '../core/Context';
 import type { Rng } from '../core/Rng';
-import { LAYOUT } from './Layout';
+import { LAYOUT } from '../core/Layout';
 import { place, type Collider } from './geom';
 
 /**

@@ -47,21 +47,6 @@ export const KEYBINDS: Record<string, string> = {
   view: 'KeyV',
 };
 
-export interface MoveDef {
-  name: string;
-  element: string;
-  dmg: number;
-  qteWindow: number;
-  charge?: number;
-}
-
-export const MOVES: Record<string, MoveDef> = {
-  babyFlame: { name: 'Baby Flame', element: 'fire', dmg: 18, qteWindow: 0.18 },
-  peppersBreath: { name: 'Peppers Breath', element: 'fire', dmg: 26, charge: 1, qteWindow: 0.14 },
-  boomBubble: { name: 'Boom Bubble', element: 'air', dmg: 16, qteWindow: 0.2 },
-  airShot: { name: 'Air Shot', element: 'air', dmg: 22, qteWindow: 0.15 },
-};
-
 export interface GameConfig {
   quality: QualityName;
   readonly q: QualityTier;
@@ -77,7 +62,7 @@ export interface GameConfig {
     staminaRegen: number;
     hp: number;
   };
-  battle: { critMult: number; parryMult: number; arenaRadius: number };
+  battle: { arenaRadius: number };
   world: {
     /** GOLDEN gold shot (ART_DIRECTION §1). */
     startHour: number;
@@ -113,7 +98,7 @@ export function defaultConfig(): GameConfig {
       staminaRegen: 15,
       hp: 100,
     },
-    battle: { critMult: 1.6, parryMult: 0.5, arenaRadius: 18 },
+    battle: { arenaRadius: 6 },
     world: { startHour: 17.0, cycleSeconds: 720, spawnRadius: 60 },
     keys: KEYBINDS,
     mouse: { sensitivity: 0.0022, fov: 70, fovSprint: 80 },

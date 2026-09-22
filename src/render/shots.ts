@@ -35,9 +35,7 @@ function posePlayer(ctx: Ctx, x: number, z: number, yaw: number, pitch: number, 
   showCrowd(ctx, true);
   const p = ctx.peek<any>('player');
   if (!p) return;
-  p.pos.set(x, p.height ?? 1.7, z);
-  p.vel.set(0, 0, 0);
-  p.yaw = yaw;
+  p.teleport(x, z, yaw);
   p.pitch = pitch;
   p.viewMode = view;
   if (p.mesh) p.mesh.visible = view === 'trainer';
