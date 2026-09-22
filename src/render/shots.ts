@@ -25,7 +25,14 @@ function setHour(ctx: Ctx, hour: number): void {
   dn?.freeze(true);
 }
 
+/** Portraits clear the crossing so passers-by never walk through the frame. */
+function showCrowd(ctx: Ctx, on: boolean): void {
+  const crowd = ctx.peek<{ root: THREE.Object3D }>('crowd');
+  if (crowd) crowd.root.visible = on;
+}
+
 function posePlayer(ctx: Ctx, x: number, z: number, yaw: number, pitch: number, view: 'fps' | 'trainer'): void {
+  showCrowd(ctx, true);
   const p = ctx.peek<any>('player');
   if (!p) return;
   p.pos.set(x, p.height ?? 1.7, z);
@@ -89,7 +96,8 @@ export const SHOTS: Record<string, Shot> = {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 14, 0, 0, 'fps');
       const d = ctx.peek<any>('digimon');
-      d?.showcase?.('agumon', new THREE.Vector3(0, 0.28, 6));
+      d?.showcase?.('agumon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
       return fixed(1.4, 1.2, 9.2, 0, 0.75, 6, 38);
     },
   },
@@ -99,8 +107,9 @@ export const SHOTS: Record<string, Shot> = {
       setHour(ctx, GOLDEN_HOUR);
       posePlayer(ctx, 0, 14, 0, 0, 'fps');
       const d = ctx.peek<any>('digimon');
-      d?.showcase?.('patamon', new THREE.Vector3(0, 0.28, 6));
-      return fixed(1.2, 1.1, 8.6, 0, 0.8, 6, 38);
+      d?.showcase?.('patamon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(1.4, 1.5, 9.9, 0, 1.05, 6, 40);
     },
   },
 };

@@ -9,7 +9,7 @@ import { UrbanProps } from './world/UrbanProps';
 import { Crowd } from './world/Crowd';
 import { Encounters } from './world/encounters.js';
 import { Player } from './player/controller.js';
-import { DigimonSystem } from './digimon/index.js';
+import { DigimonSystem } from './digimon';
 import { Battle } from './battle/index.js';
 import { TrainerProfile } from './trainer/profile.js';
 import { Digivice } from './digivice/index.js';

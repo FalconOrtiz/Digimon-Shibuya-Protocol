@@ -11,20 +11,26 @@ import { makeRng, clamp } from '../core/Noise';
  * the same game.
  */
 
-export type StarterId = 'flaremon' | 'earwingmon';
+export type StarterId = 'agumon' | 'patamon';
 
-/** Champion forms — the Rookie's digivolution (Flaremon→Greymon, Earwingmon→Angemon). */
+/** Champion forms — the Rookie's digivolution (Agumon→Greymon, Patamon→Angemon). */
 export type ChampionId = 'greymon' | 'angemon';
 
 /** Ultimate forms — the Champion's digivolution. */
 export type UltimateId = 'metalgreymon' | 'magnaangemon';
 
+/** Wild In-Training forms that patrol the crossing. */
+export type InTrainingId = 'koromon' | 'nyaromon' | 'bukamon';
+
 /** Every buildable species. */
-export type SpeciesId = StarterId | ChampionId | UltimateId;
+export type SpeciesId = StarterId | ChampionId | UltimateId | InTrainingId;
 
 export const SPECIES: Record<SpeciesId, { name: string; types: string[] }> = {
-  flaremon: { name: 'Flaremon', types: ['Fire'] },
-  earwingmon: { name: 'Earwingmon', types: ['Flying'] },
+  koromon: { name: 'Koromon', types: ['Neutral'] },
+  nyaromon: { name: 'Nyaromon', types: ['Neutral'] },
+  bukamon: { name: 'Bukamon', types: ['Water'] },
+  agumon: { name: 'Agumon', types: ['Fire'] },
+  patamon: { name: 'Patamon', types: ['Flying'] },
   greymon: { name: 'Greymon', types: ['Fire'] },
   angemon: { name: 'Angemon', types: ['Flying'] },
   metalgreymon: { name: 'MetalGreymon', types: ['Fire'] },
@@ -33,8 +39,8 @@ export const SPECIES: Record<SpeciesId, { name: string; types: string[] }> = {
 
 /** Digivolution table: Rookie -> Champion -> Ultimate. */
 export const EVOLUTIONS: Partial<Record<SpeciesId, SpeciesId>> = {
-  flaremon: 'greymon',
-  earwingmon: 'angemon',
+  agumon: 'greymon',
+  patamon: 'angemon',
   greymon: 'metalgreymon',
   angemon: 'magnaangemon',
 };
@@ -51,8 +57,8 @@ export interface Creature {
 }
 
 export const STARTERS: { id: StarterId; name: string; type: string; blurb: string }[] = [
-  { id: 'flaremon', name: 'Flaremon', type: 'Fire', blurb: 'A fiery rookie Digimon with a brave heart. Its claws burn bright when it fights for its partner.' },
-  { id: 'earwingmon', name: 'Earwingmon', type: 'Flying', blurb: 'A gentle rookie Digimon with bat-like ears. It glides on the evening wind over Shibuya.' },
+  { id: 'agumon', name: 'Agumon', type: 'Fire', blurb: 'A fiery rookie Digimon with a brave heart. Its claws burn bright when it fights for its partner.' },
+  { id: 'patamon', name: 'Patamon', type: 'Flying', blurb: 'A gentle rookie Digimon with bat-like ears. It glides on the evening wind over Shibuya.' },
 ];
 
 /**

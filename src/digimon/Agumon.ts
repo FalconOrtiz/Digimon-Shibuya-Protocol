@@ -6,32 +6,34 @@ import { createRig, IdleAnimator, disposeCreature, type Creature } from './share
 import { fixOutward, weldDecimate, markSculpt, ramp, buildEye, clawGeometry, type MarkField } from './sculpt-util';
 
 /**
- * Flaremon — an upright little fire dinosaur (Agumon lineage).
+ * Agumon — upright little fire dinosaur, the fire partner.
  *
- * Reference: `references/partners/agumon01.png` — orange bipedal dinosaur,
- * big head with a wide jaw, small arms with white claws, stocky legs, and a
- * tapering tail. Green eyes. Everything reads from the silhouette first:
- * chunky rounded forms, no sharp edges, a soft cream belly field.
+ * Reference: `docs/referencias/assets/agumon01.png` — orange bipedal
+ * dinosaur, big head with a wide jaw, small arms with white claws, stocky
+ * legs, a tapering tail and green eyes. The reference is faceted low-poly:
+ * the sculpt is welded coarse and flat-shaded so the planes read.
  */
 
 /* ------------------------------------------------------------------ */
 /* Palette                                                             */
 /* ------------------------------------------------------------------ */
 
-const SKIN = 0xd07020;      // orange body (from reference dominant colours)
-const SKIN_DARK = 0xa04010; // shadow-orange for the snout top
-const BELLY = 0xf0d8a8;     // cream belly
-const CLAW = 0xf4ead6;      // white claws
-const IRIS = 0x1f8f4a;      // green eyes
-const IRIS_EMISSIVE = 0x0e5a2c;
+const SKIN = 0xe8782a;      // orange body (reference dominant colour)
+const BELLY = 0xf29a4c;     // lighter orange belly, not cream
+const CLAW = 0xf4f0ea;      // white claws
+const IRIS = 0x3aa84a;      // green eyes
+const IRIS_EMISSIVE = 0x16602a;
+/** Weld cell sizes: coarse enough that the facets of the reference show. */
+const BODY_FACET = 0.016;
+const HEAD_FACET = 0.0125;
 
 /* ------------------------------------------------------------------ */
 /* Build                                                               */
 /* ------------------------------------------------------------------ */
 
-export function buildFlaremon(): Creature {
+export function buildAgumon(): Creature {
   const rig = createRig();
-  rig.root.name = 'Flaremon';
+  rig.root.name = 'Agumon';
 
   /* ---- Materials --------------------------------------------------- */
   const skinC = new THREE.Color(SKIN);
@@ -48,6 +50,7 @@ export function buildFlaremon(): Creature {
   painted.specularIntensity = 0.30;
   painted.specularColor = new THREE.Color(0xffc59a);
   painted.roughnessMap = null;
+  painted.flatShading = true;
 
   const baseCompile = painted.onBeforeCompile;
   painted.onBeforeCompile = (shader, renderer) => {
@@ -71,7 +74,7 @@ export function buildFlaremon(): Creature {
         `,
       );
   };
-  painted.customProgramCacheKey = () => 'flaremon|marked';
+  painted.customProgramCacheKey = () => 'agumon|marked';
 
   const plainSkin = creatureSkin({
     color: SKIN, subsurface: 0xd0561a, wrap: 0.06, rim: 0.018,
@@ -158,8 +161,8 @@ export function buildFlaremon(): Creature {
 
   const BODY_RES = 42;
   let bodyGeo = metaSurface(bodyBalls, { resolution: BODY_RES, smooth: 0.86, padding: 0.026 });
-  fixOutward(bodyGeo, 'flaremon-body');
-  bodyGeo = weldDecimate(bodyGeo, 0.0105);
+  fixOutward(bodyGeo, 'agumon-body');
+  bodyGeo = weldDecimate(bodyGeo, BODY_FACET);
   bodyGeo.setAttribute('uv', boxProjectedUV(bodyGeo, 17));
 
   // Cream belly field: angular about a per-height centre line, tapering to
@@ -219,16 +222,13 @@ export function buildFlaremon(): Creature {
 
   const HEAD_RES = 46;
   let headGeo = metaSurface(headBalls, { resolution: HEAD_RES, smooth: 0.92, padding: 0.024 });
-  fixOutward(headGeo, 'flaremon-head');
-  headGeo = weldDecimate(headGeo, 0.0080);
+  fixOutward(headGeo, 'agumon-head');
+  headGeo = weldDecimate(headGeo, HEAD_FACET);
   headGeo.setAttribute('uv', boxProjectedUV(headGeo, 17));
 
-  // The head keeps a warm cream chin patch — Agumon's jaw is lighter.
-  const headMark: MarkField = (_x, y, _z, _nx, _ny, _nz) => {
-    if (y < -0.036) return 1;      // chin is cream
-    return -1;
-  };
-  markSculpt(headGeo, new THREE.Vector3(0, 0, 0.01), headMark, 0.20, 4);
+  // The reference head is one colour; only the belly field is lighter.
+  const headMark: MarkField = () => -1;
+  markSculpt(headGeo, new THREE.Vector3(0, 0, 0.01), headMark, 0.20, 1);
 
   const head = new THREE.Mesh(headGeo, painted);
   head.castShadow = true;
@@ -237,11 +237,12 @@ export function buildFlaremon(): Creature {
 
   /* ---- Eyes -------------------------------------------------------- */
   // Big green eyes on the front of the face.
-  const EYE_W = 0.0240;
-  const EYE_H = 0.0350;
+  // The reference eyes are huge: nearly a third of the face width each.
+  const EYE_W = 0.0330;
+  const EYE_H = 0.0400;
   for (const s of [1, -1]) {
-    const { holder, lid } = buildEye(EYE_W, EYE_H, s, 0.30, plainSkin, IRIS, IRIS_EMISSIVE);
-    holder.position.set(s * 0.0340, 0.0260, 0.0600);
+    const { holder, lid } = buildEye(EYE_W, EYE_H, s, 0.34, plainSkin, IRIS, IRIS_EMISSIVE);
+    holder.position.set(s * 0.0420, 0.0300, 0.0560);
     rig.head.add(holder);
     rig.eyes.push(holder);
     rig.eyelids.push(lid);
@@ -342,6 +343,8 @@ export function buildFlaremon(): Creature {
     tailGeo.computeVertexNormals();
   }
   tailGeo.setAttribute('uv', boxProjectedUV(tailGeo, 17));
+  // `painted` needs colour + aMark attributes on every mesh it shades.
+  markSculpt(tailGeo, new THREE.Vector3(0, 0, 0), () => -1, 0.12, 1);
 
   const tailMesh = new THREE.Mesh(tailGeo, painted);
   tailMesh.castShadow = true;
@@ -354,8 +357,8 @@ export function buildFlaremon(): Creature {
   let attention = 0;
 
   return {
-    id: 'flaremon',
-    name: 'Flaremon',
+    id: 'agumon',
+    name: 'Agumon',
     group: rig.root,
     get attention() { return attention; },
     set attention(v: number) { attention = clamp(v, 0, 1); },

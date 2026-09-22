@@ -89,7 +89,8 @@ export function creatureSkin(opts: SkinOptions): THREE.MeshPhysicalMaterial {
         '#include <dithering_fragment>',
         /* glsl */ `
         {
-          vec3 N = normalize(vNormal);
+          // normal (not vNormal): flat-shaded sculpts have no vNormal varying.
+          vec3 N = normalize(normal);
           vec3 V = normalize(vViewPosition);
 
           // --- Wrapped diffuse -----------------------------------------
