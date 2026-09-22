@@ -175,10 +175,12 @@ export class CityBlocks implements GameSystem {
       spec.signs = signs;
       spec.ad = ad;
       if (!ad && near && rng.chance(0.4)) {
+        // Six shared screen variants: each is an animated canvas, so sharing caps both draws and redraws.
+        const v = rng.int(0, 5);
         spec.billboard = {
           w: lot * 0.55, h: lot * 0.34, y: Math.min(h - 3, 9 + rng.range(0, 4)),
-          width: 384, height: 240, seed: n + 20, palette: [rng.pick(NEON), rng.pick(NEON), 0xffffff],
-          text: rng.pick(SIGNS_H),
+          width: 384, height: 240, seed: 20 + v, palette: [NEON[v], NEON[(v + 3) % NEON.length], 0xffffff],
+          text: SIGNS_H[v],
         };
       }
       this.tower(bins, size, spec);

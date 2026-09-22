@@ -130,7 +130,6 @@ export class Digivice implements GameSystem {
     (document.getElementById('ui-root') ?? document.body).appendChild(this.root);
     this.buildShell();
 
-    ctx.events.on('digivice:message', (p: { text: string }) => this.toast(p.text));
     ctx.events.on('mode', (p: { mode: string }) => {
       if (p.mode === 'battle' && this.open) this.close();
     });

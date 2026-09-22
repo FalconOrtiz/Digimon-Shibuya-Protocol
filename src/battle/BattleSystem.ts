@@ -31,6 +31,8 @@ export interface BattleRequest {
   trainerName?: string | null;
   rival?: boolean;
   seed?: number;
+  /** Capturas: avanza rápido la intro y congela el reloj al llegar al menú. */
+  hold?: boolean;
 }
 
 interface PartyMemberLike {
@@ -219,6 +221,7 @@ export class BattleSystem implements GameSystem {
       chips: trainer.chips,
     });
     this.fx.reseed(seed ^ 0x77);
+    if (req.hold) this.timeScale = 30;
 
     this.arena.show();
     this.ctx.events.emit('battle:start', {
@@ -279,6 +282,15 @@ export class BattleSystem implements GameSystem {
     this.phase = 'menu';
     this.marker = b.gradient >= 100 ? 'gradient-ready' : 'menu';
     this.idleDrift = true;
+    if (this.request?.hold) {
+      this.request.hold = false;
+      const { pos, look } = this.wideShot();
+      this.cutTo(pos, look);
+      this.idleDrift = false;
+      this.timeScale = 0;
+      this.fx.clear();
+      this.wild?.model.scale.setScalar(1);
+    }
     this.pendingAction = null;
     this.emitState();
     this.emitMenu(true);

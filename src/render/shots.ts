@@ -43,6 +43,12 @@ function posePlayer(ctx: Ctx, x: number, z: number, yaw: number, pitch: number, 
   digimon?.snapToPlayer?.();
 }
 
+/** Arranca un combate congelado en el menú (la cámara la lleva `battle`). */
+function startBattle(ctx: Ctx, species: string): void {
+  const battle = ctx.peek<{ start(req: object): void }>('battle');
+  battle?.start({ enemySpecies: species, enemyLevel: 4, seed: 7, hold: true });
+}
+
 function fixed(px: number, py: number, pz: number, tx: number, ty: number, tz: number, fov = 60): ShotPose {
   return { position: new THREE.Vector3(px, py, pz), target: new THREE.Vector3(tx, ty, tz), fov };
 }
@@ -85,6 +91,24 @@ export const SHOTS: Record<string, Shot> = {
     apply(ctx) {
       setHour(ctx, NIGHT_HOUR);
       posePlayer(ctx, 0, 12, 0, -0.1, 'trainer');
+      return null;
+    },
+  },
+  'battle-golden': {
+    label: 'GOLDEN 17:00 — combate E33 en el cruce, menú',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 3, 12, 0.1, 0, 'trainer');
+      startBattle(ctx, 'koromon');
+      return null;
+    },
+  },
+  'battle-night': {
+    label: 'NIGHT 21:30 — combate E33 en el cruce, menú',
+    apply(ctx) {
+      setHour(ctx, NIGHT_HOUR);
+      posePlayer(ctx, 3, 12, 0.1, 0, 'trainer');
+      startBattle(ctx, 'bukamon');
       return null;
     },
   },

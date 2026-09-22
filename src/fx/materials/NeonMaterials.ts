@@ -62,7 +62,68 @@ export function currentNightFactor(): number {
 /* ------------------------------------------------------------------ */
 
 const css = (h: number) => `#${h.toString(16).padStart(6, '0')}`;
-const signCache = new Map<string, { material: THREE.MeshBasicMaterial; aspect: number }>();
+
+export interface NeonSign {
+  material: THREE.MeshBasicMaterial;
+  aspect: number;
+  /** Sub-rect of the atlas page: [u0, v0, u1, v1]. */
+  uv: [number, number, number, number];
+}
+
+const signCache = new Map<string, NeonSign>();
+
+/**
+ * Every sign face shares a few 2048² atlas pages, so the whole city's signage
+ * is one material per page and merges into a handful of draw calls.
+ */
+const PAGE = 2048;
+/** Gutter filled with the panel colour so mip levels never bleed a neighbour in. */
+const GUTTER = 6;
+
+interface AtlasPage {
+  canvas: HTMLCanvasElement;
+  g: CanvasRenderingContext2D;
+  texture: THREE.CanvasTexture;
+  material: THREE.MeshBasicMaterial;
+  x: number;
+  y: number;
+  rowH: number;
+}
+
+const pages: AtlasPage[] = [];
+
+function newPage(): AtlasPage {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = PAGE;
+  const g = canvas.getContext('2d')!;
+  g.fillStyle = '#16141c';
+  g.fillRect(0, 0, PAGE, PAGE);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 8;
+  const material = registerEmissive(new THREE.MeshBasicMaterial({ map: texture, toneMapped: false }), 0.95, 2.6);
+  material.name = `neon.atlas.${pages.length}`;
+  const page = { canvas, g, texture, material, x: 0, y: 0, rowH: 0 };
+  pages.push(page);
+  return page;
+}
+
+/** Shelf packing: left to right, next row when full, next page when the page is. */
+function allocate(w: number, h: number): { page: AtlasPage; x: number; y: number } {
+  const W = w + GUTTER * 2;
+  const H = h + GUTTER * 2;
+  let page = pages[pages.length - 1] ?? newPage();
+  if (page.x + W > PAGE) {
+    page.x = 0;
+    page.y += page.rowH;
+    page.rowH = 0;
+  }
+  if (page.y + H > PAGE) page = newPage();
+  const at = { page, x: page.x + GUTTER, y: page.y + GUTTER };
+  page.x += W;
+  page.rowH = Math.max(page.rowH, H);
+  return at;
+}
 
 export interface NeonSignOptions {
   text: string;
@@ -78,20 +139,23 @@ export interface NeonSignOptions {
  * inner white core so the bloom reads as gas-filled glass. Returns the width /
  * height ratio so callers size the quad to the text.
  */
-export function neonSignMaterial(o: NeonSignOptions): { material: THREE.MeshBasicMaterial; aspect: number } {
+export function neonSignMaterial(o: NeonSignOptions): NeonSign {
   const key = `${o.text}|${o.color}|${o.vertical ? 'v' : 'h'}|${o.panel ?? 0}`;
   const hit = signCache.get(key);
   if (hit) return hit;
   const chars = [...o.text];
   const cell = 96;
-  const w = o.vertical ? cell * 1.3 : Math.max(2, chars.length) * cell * 0.72 + cell * 0.8;
-  const h = o.vertical ? chars.length * cell + cell * 0.5 : cell * 1.5;
-  const canvas = document.createElement('canvas');
-  canvas.width = Math.ceil(w);
-  canvas.height = Math.ceil(h);
-  const g = canvas.getContext('2d')!;
+  const w = Math.ceil(o.vertical ? cell * 1.3 : Math.max(2, chars.length) * cell * 0.72 + cell * 0.8);
+  const h = Math.ceil(o.vertical ? chars.length * cell + cell * 0.5 : cell * 1.5);
+  const { page, x, y } = allocate(w, h);
+  const g = page.g;
+  g.save();
   g.fillStyle = css(o.panel ?? 0x16141c);
-  g.fillRect(0, 0, w, h);
+  g.fillRect(x - GUTTER, y - GUTTER, w + GUTTER * 2, h + GUTTER * 2);
+  g.beginPath();
+  g.rect(x, y, w, h);
+  g.clip();
+  g.translate(x, y);
   g.strokeStyle = css(o.color);
   g.globalAlpha = 0.5;
   g.lineWidth = 4;
@@ -110,14 +174,24 @@ export function neonSignMaterial(o: NeonSignOptions): { material: THREE.MeshBasi
   draw(28, css(o.color));
   draw(10, css(o.color));
   draw(0, 'rgba(255,255,255,0.85)');
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 8;
-  const material = registerEmissive(new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }), 0.95, 2.6);
-  material.name = `neon.${o.text}`;
-  const out = { material, aspect: w / h };
+  g.restore();
+  page.texture.needsUpdate = true;
+  const out: NeonSign = {
+    material: page.material,
+    aspect: w / h,
+    uv: [x / PAGE, 1 - (y + h) / PAGE, (x + w) / PAGE, 1 - y / PAGE],
+  };
   signCache.set(key, out);
   return out;
+}
+
+/** Remaps a 0-1 quad's UVs into a sign's atlas rect. */
+export function applySignUV(geo: THREE.BufferGeometry, uv: NeonSign['uv']): THREE.BufferGeometry {
+  const a = geo.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < a.count; i++) {
+    a.setXY(i, uv[0] + a.getX(i) * (uv[2] - uv[0]), uv[1] + a.getY(i) * (uv[3] - uv[1]));
+  }
+  return geo;
 }
 
 /* ------------------------------------------------------------------ */
@@ -129,11 +203,17 @@ let screenClock = 0;
 const SCREEN_HZ = 12;
 
 /** A self-lit LED screen. Brighter than neon by day: real screens fight the sun. */
+const screenCache = new Map<string, THREE.MeshBasicMaterial>();
+
 export function ledScreenMaterial(o: LedScreenOptions): THREE.MeshBasicMaterial {
+  const key = JSON.stringify([o.width, o.height, o.seed, o.text, o.imageUrl, o.palette]);
+  const hit = screenCache.get(key);
+  if (hit) return hit;
   const screen = ledScreenTexture(o);
   screens.push(screen);
   const m = registerEmissive(new THREE.MeshBasicMaterial({ map: screen.texture, toneMapped: false }), 1.0, 0.85);
   m.name = `led.${o.text ?? o.imageUrl ?? o.seed}`;
+  screenCache.set(key, m);
   return m;
 }
 

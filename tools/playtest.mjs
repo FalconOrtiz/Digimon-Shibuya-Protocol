@@ -44,7 +44,7 @@ try {
   };
 
   await page.evaluate(() => {
-    window.__BATTLE__.start({ enemySpecies: 'nyaromon', enemyLevel: 4, seed: 11 });
+    window.__BATTLE__.start({ enemySpecies: 'nyaromon', enemyLevel: 8, seed: 11 });
     window.__BATTLE__.setTimeScale(8);
   });
   await until(/^menu:/);
@@ -62,8 +62,10 @@ try {
     if (type === 'digivolve' && g.gradient < 50) continue;
     if (type === 'aim' && g.ap < 1) continue;
     await page.evaluate(([t, i]) => window.__BATTLE__.act(t, i), [type, index]);
+    if (!(await until(/^(?!menu:)/, 3000).catch(() => null))) continue;
     if (type === 'aim') {
-      await until(/^aim:/);
+      await until(/^(aim|idle):/);
+      if ((await state()).startsWith('idle')) break;
       await snap('02-aim');
       await page.evaluate(() => window.__BATTLE__.aim(0.5, 0.45));
     }

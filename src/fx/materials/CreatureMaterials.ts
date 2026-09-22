@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { bakeColorMap, bakeNormalMap, bakeScalarMap, cached, mixHex, NOISE } from '../../core/TextureLab';
 import { tileableFbm, worley, clamp, smoothstep } from '../../core/Noise';
 
@@ -193,75 +194,82 @@ export interface EyeOptions {
  * near-zero roughness produces a pinpoint highlight so intense it blooms into a
  * white blob that swallows the whole iris.
  */
+/** Eye materials are shared by every eye; `userData.shared` keeps disposers off them. */
+let eyeDecal: THREE.MeshBasicMaterial | null = null;
+export function eyeDecalMaterial(): THREE.MeshBasicMaterial {
+  eyeDecal ??= new THREE.MeshBasicMaterial({ vertexColors: true, name: 'eye.decal', userData: { shared: true } });
+  return eyeDecal;
+}
+
+let sclera: THREE.MeshPhysicalMaterial | null = null;
+function scleraMaterial(): THREE.MeshPhysicalMaterial {
+  // Slightly off-white and a touch rougher, so the sclera does not clip.
+  sclera ??= new THREE.MeshPhysicalMaterial({
+    color: 0xf2ece4,
+    roughness: 0.34,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.18,
+    name: 'eye.sclera',
+    userData: { shared: true },
+  });
+  return sclera;
+}
+
+/** Bakes a flat colour into a geometry's vertex colours (linear, like material colours). */
+export function paint(geo: THREE.BufferGeometry, hex: number): THREE.BufferGeometry {
+  const c = new THREE.Color(hex);
+  const n = geo.attributes.position.count;
+  const data = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) data.set([c.r, c.g, c.b], i * 3);
+  geo.setAttribute('color', new THREE.BufferAttribute(data, 3));
+  return geo;
+}
+
 export function makeEye(opts: EyeOptions): THREE.Group {
   const { radius, irisColor, pupilColor = 0x120f0e, irisScale = 0.66, catchlight = true } = opts;
   const g = new THREE.Group();
   g.name = 'Eye';
 
-  const sclera = new THREE.Mesh(
-    new THREE.SphereGeometry(radius, 24, 20),
-    new THREE.MeshPhysicalMaterial({
-      // Slightly off-white and a touch rougher, so the sclera does not clip.
-      color: 0xf2ece4,
-      roughness: 0.34,
-      clearcoat: 0.5,
-      clearcoatRoughness: 0.18,
-    }),
-  );
-  g.add(sclera);
+  g.add(new THREE.Mesh(new THREE.SphereGeometry(radius, 24, 20), scleraMaterial()));
 
   // Iris, limbal ring and pupil are shallow spherical caps sitting just proud
   // of the sclera, so they curve with the eyeball instead of floating as decals.
   const irisR = radius * irisScale;
   const capAngle = (r: number) => Math.asin(clamp(r / radius, 0, 1));
 
+  // Everything unlit on the eye is one vertex-coloured mesh: one draw call
+  // instead of five, per eye, for every creature and passer-by.
+  const parts: THREE.BufferGeometry[] = [];
+  const cap = (r: number, angle: number, w: number, h: number, color: number) => {
+    const geo = new THREE.SphereGeometry(r, w, h, 0, Math.PI * 2, 0, angle);
+    geo.rotateX(Math.PI / 2);
+    parts.push(paint(geo, color));
+  };
+  const bead = (r: number, w: number, h: number, x: number, y: number, z: number, color: number) => {
+    const geo = new THREE.SphereGeometry(r, w, h);
+    geo.translate(x, y, z);
+    parts.push(paint(geo, color));
+  };
+
   // Limbal ring first, very slightly larger than the iris, unlit so it holds.
-  const limbal = new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 1.004, 28, 18, 0, Math.PI * 2, 0, capAngle(irisR * 1.1)),
-    new THREE.MeshBasicMaterial({ color: 0x1b1412 }),
-  );
-  limbal.rotation.x = Math.PI / 2;
-  g.add(limbal);
-
+  cap(radius * 1.004, capAngle(irisR * 1.1), 28, 18, 0x1b1412);
   // The iris is unlit too. A lit iris loses its hue the moment the key light is
-  // strong, and hue is the only thing distinguishing these three characters'
-  // eyes from each other.
-  const iris = new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 1.008, 24, 18, 0, Math.PI * 2, 0, capAngle(irisR)),
-    new THREE.MeshBasicMaterial({ color: irisColor }),
-  );
-  iris.rotation.x = Math.PI / 2;
-  g.add(iris);
-
-  const pupilR = irisR * 0.52;
-  const pupil = new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 1.014, 20, 14, 0, Math.PI * 2, 0, capAngle(pupilR)),
-    new THREE.MeshBasicMaterial({ color: pupilColor }),
-  );
-  pupil.rotation.x = Math.PI / 2;
-  g.add(pupil);
-
+  // strong, and hue is the only thing distinguishing these characters' eyes.
+  cap(radius * 1.008, capAngle(irisR), 24, 18, irisColor);
+  cap(radius * 1.014, capAngle(irisR * 0.52), 20, 14, pupilColor);
   // Primary catchlight, offset up-left as in every animated character since the
-  // 1930s. Unlit so it survives shadow, but kept small and just under pure
-  // white — at full white and larger it was the brightest thing in frame and
-  // bloomed across the whole eye.
-  const hi = new THREE.Mesh(
-    new THREE.SphereGeometry(radius * 0.15, 12, 10),
-    new THREE.MeshBasicMaterial({ color: 0xf6f8fb }),
-  );
-  hi.position.set(-radius * 0.32, radius * 0.34, radius * 0.94);
-  g.add(hi);
-
+  // 1930s. Kept small and just under pure white — at full white and larger it
+  // was the brightest thing in frame and bloomed across the whole eye.
+  bead(radius * 0.15, 12, 10, -radius * 0.32, radius * 0.34, radius * 0.94, 0xf6f8fb);
   if (catchlight) {
-    // Secondary bounce light, lower-right, dimmer — implies a sky above and
-    // a bright ground below.
-    const hi2 = new THREE.Mesh(
-      new THREE.SphereGeometry(radius * 0.085, 10, 8),
-      new THREE.MeshBasicMaterial({ color: 0xcfe0f5, transparent: true, opacity: 0.6 }),
-    );
-    hi2.position.set(radius * 0.32, -radius * 0.28, radius * 0.94);
-    g.add(hi2);
+    // Secondary bounce light, lower-right, dimmer: 60 % over the iris colour.
+    const dim = new THREE.Color(irisColor).lerp(new THREE.Color(0xcfe0f5), 0.6).getHex();
+    bead(radius * 0.085, 10, 8, radius * 0.32, -radius * 0.28, radius * 0.94, dim);
   }
+  const decal = new THREE.Mesh(mergeGeometries(parts, false)!, eyeDecalMaterial());
+  decal.name = 'EyeDecal';
+  for (const p of parts) p.dispose();
+  g.add(decal);
 
   g.traverse((o) => {
     o.castShadow = false;

@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { bendY } from '../fx/Sculpt';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lerp, clamp } from '../core/Noise';
+import { eyeDecalMaterial, paint } from '../fx/materials/CreatureMaterials';
 
 /**
  * sculpt-util — shared sculpting helpers used by the Digimon partners.
@@ -240,6 +242,30 @@ export function clawGeometry(len: number, rad: number): THREE.BufferGeometry {
 /* Toon eye                                                            */
 /* ------------------------------------------------------------------ */
 
+let scleraMat: THREE.MeshPhysicalMaterial | null = null;
+function toonScleraMaterial(): THREE.MeshPhysicalMaterial {
+  scleraMat ??= new THREE.MeshPhysicalMaterial({
+    color: 0xf4f1e6, roughness: 0.35, clearcoat: 0.25, clearcoatRoughness: 0.35,
+    envMapIntensity: 0.12, name: 'eye.toonSclera', userData: { shared: true },
+  });
+  return scleraMat;
+}
+
+const irisCache = new Map<string, THREE.MeshPhysicalMaterial>();
+function irisMaterial(color: number, emissive: number): THREE.MeshPhysicalMaterial {
+  const key = `${color}:${emissive}`;
+  let m = irisCache.get(key);
+  if (!m) {
+    m = new THREE.MeshPhysicalMaterial({
+      color, roughness: 0.38, clearcoat: 0.3, clearcoatRoughness: 0.3,
+      envMapIntensity: 0.10, emissive, emissiveIntensity: 0.5,
+      name: `eye.iris.${key}`, userData: { shared: true },
+    });
+    irisCache.set(key, m);
+  }
+  return m;
+}
+
 export interface EyeParts {
   holder: THREE.Group;
   lid: THREE.Mesh;
@@ -261,49 +287,32 @@ export function buildEye(
 ): EyeParts {
   const holder = new THREE.Group();
   holder.rotation.y = side * splay;
+  holder.userData.static = true;
 
   const d = w * 0.85;
 
-  const liner = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 20, 14),
-    new THREE.MeshStandardMaterial({ color: 0x14262c, roughness: 0.55 }),
-  );
-  liner.scale.set(w * 1.10, h * 1.075, d * 0.92);
-  liner.position.z = -d * 0.05;
-  holder.add(liner);
-
-  const sclera = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 20, 14),
-    new THREE.MeshPhysicalMaterial({
-      color: 0xf4f1e6, roughness: 0.35, clearcoat: 0.25, clearcoatRoughness: 0.35,
-      envMapIntensity: 0.12,
-    }),
-  );
+  const sclera = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), toonScleraMaterial());
   sclera.scale.set(w, h, d);
   holder.add(sclera);
 
-  const capMesh = (reach: number, inflate: number, mat: THREE.Material): THREE.Mesh => {
+  const capGeo = (reach: number, inflate: number): THREE.BufferGeometry => {
     const geo = new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.asin(clamp(reach, 0, 1)));
-    const m = new THREE.Mesh(geo, mat);
-    m.rotation.x = Math.PI / 2;
-    m.scale.set(w * inflate, d * inflate, h * inflate);
-    return m;
+    geo.rotateX(Math.PI / 2);
+    geo.scale(w * inflate, h * inflate, d * inflate);
+    return geo;
   };
-  const iris = capMesh(0.93, 1.02, new THREE.MeshPhysicalMaterial({
-    color: irisColor, roughness: 0.38, clearcoat: 0.3, clearcoatRoughness: 0.3,
-    envMapIntensity: 0.10, emissive: irisEmissive, emissiveIntensity: 0.5,
-  }));
-  holder.add(iris);
-  const pupil = capMesh(0.46, 1.035, new THREE.MeshBasicMaterial({ color: 0x101314 }));
-  holder.add(pupil);
+  holder.add(new THREE.Mesh(capGeo(0.93, 1.02), irisMaterial(irisColor, irisEmissive)));
 
-  const hi = new THREE.Mesh(
-    new THREE.SphereGeometry(1, 10, 8),
-    new THREE.MeshBasicMaterial({ color: 0xeef1f4 }),
-  );
-  hi.scale.set(w * 0.20, h * 0.13, d * 0.18);
-  hi.position.set(-w * 0.18, h * 0.16, d * 0.99);
-  holder.add(hi);
+  const liner = new THREE.SphereGeometry(1, 20, 14);
+  liner.scale(w * 1.10, h * 1.075, d * 0.92);
+  liner.translate(0, 0, -d * 0.05);
+  const hi = new THREE.SphereGeometry(1, 10, 8);
+  hi.scale(w * 0.20, h * 0.13, d * 0.18);
+  hi.translate(-w * 0.18, h * 0.16, d * 0.99);
+  const parts = [paint(liner, 0x14262c), paint(capGeo(0.46, 1.035), 0x101314), paint(hi, 0xeef1f4)];
+  const decal = new THREE.Mesh(mergeGeometries(parts, false)!, eyeDecalMaterial());
+  for (const p of parts) p.dispose();
+  holder.add(decal);
 
   const LR = Math.max(w, h) * 1.1;
   const lidGeo = new THREE.SphereGeometry(LR, 14, 5, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
@@ -313,6 +322,7 @@ export function buildEye(
   lid.position.set(0, h * 0.94, -d * 0.35);
   lid.scale.y = 0;
   lid.castShadow = false;
+  lid.userData.anim = true;
   holder.add(lid);
 
   return { holder, lid };

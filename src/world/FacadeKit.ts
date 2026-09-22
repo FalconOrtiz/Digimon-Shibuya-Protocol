@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { roundedBox } from '../fx/Sculpt';
 import { facadeMaterial, roofMaterial, trimMaterial, shopGlassMaterial, type FacadeSpec } from '../fx/materials/BuildingMaterials';
-import { neonSignMaterial, ledScreenMaterial } from '../fx/materials/NeonMaterials';
+import { neonSignMaterial, ledScreenMaterial, applySignUV, type NeonSign } from '../fx/materials/NeonMaterials';
 import { paintedMetal, shutterMaterial } from '../fx/materials/PropMaterials';
 import type { LedScreenOptions } from '../core/TextureLab';
 import { MergeBin, facadeUV, place, type Collider } from './geom';
@@ -82,8 +82,9 @@ function slab(bins: KitBins, mat: THREE.Material, w: number, h: number, d: numbe
 }
 
 /** Quad facing `dir`, centred at (x, y, z). */
-function quad(bin: MergeBin, mat: THREE.Material, w: number, h: number, x: number, y: number, z: number, dir: [number, number]): void {
+function quad(bin: MergeBin, mat: THREE.Material, w: number, h: number, x: number, y: number, z: number, dir: [number, number], uv?: NeonSign['uv']): void {
   const g = new THREE.PlaneGeometry(w, h);
+  if (uv) applySignUV(g, uv);
   bin.add(g, mat, place(x, y, z, Math.atan2(dir[0], dir[1])));
 }
 
@@ -137,7 +138,7 @@ export function buildTower(t: TowerSpec, bins: KitBins, size: number): Collider 
       [cw / 2 + 0.02, 0, cd, [1, 0]],
       [-cw / 2 - 0.02, 0, cd, [-1, 0]],
     ] as [number, number, number, [number, number]][]) {
-      quad(bins.glow, band.material, w, 0.8, t.x + dx, top - 1.6, t.z + dz, dir);
+      quad(bins.glow, band.material, w, 0.8, t.x + dx, top - 1.6, t.z + dz, dir, band.uv);
     }
   }
 
@@ -176,8 +177,8 @@ export function buildTower(t: TowerSpec, bins: KitBins, size: number): Collider 
       const y = 4.6 + hgt / 2 + (i >> 1) * 1.2;
       const [sx, , sz] = at(along, wid / 2 + 0.25, y);
       // Two faces back to back so the blade reads from both ends of the street.
-      quad(bins.glow, sm.material, wid, hgt, sx + r[0] * 0.06, y, sz + r[1] * 0.06, r);
-      quad(bins.glow, sm.material, wid, hgt, sx - r[0] * 0.06, y, sz - r[1] * 0.06, [-r[0], -r[1]]);
+      quad(bins.glow, sm.material, wid, hgt, sx + r[0] * 0.06, y, sz + r[1] * 0.06, r, sm.uv);
+      quad(bins.glow, sm.material, wid, hgt, sx - r[0] * 0.06, y, sz - r[1] * 0.06, [-r[0], -r[1]], sm.uv);
       const cab = Math.abs(r[0]) > 0 ? [0.1, hgt + 0.2, wid + 0.2] : [wid + 0.2, hgt + 0.2, 0.1];
       slab(bins, trimMaterial(), cab[0], cab[1], cab[2], sx, y, sz, 0.04);
     } else {
@@ -185,7 +186,7 @@ export function buildTower(t: TowerSpec, bins: KitBins, size: number): Collider 
       const hgt = wid / sm.aspect;
       const y = podiumH + 1.2 + hgt / 2 + i * 0.4;
       const [sx, , sz] = at((hash(t.seed, 60 + i) - 0.5) * faceWidth * 0.2, 0.22, y);
-      quad(bins.glow, sm.material, wid, hgt, sx, y, sz, f);
+      quad(bins.glow, sm.material, wid, hgt, sx, y, sz, f, sm.uv);
     }
   });
 
@@ -246,7 +247,7 @@ export function buildRoundTower(
   const wid = hgt * sm.aspect;
   const sx = o.x + o.face[0] * (o.radius + 0.35);
   const sz = o.z + o.face[1] * (o.radius + 0.35);
-  quad(bins.glow, sm.material, wid, hgt, sx, o.h * 0.56, sz, o.face);
+  quad(bins.glow, sm.material, wid, hgt, sx, o.h * 0.56, sz, o.face, sm.uv);
   return { x: o.x - o.radius, z: o.z - o.radius, w: o.radius * 2, d: o.radius * 2, h: o.h };
 }
 
