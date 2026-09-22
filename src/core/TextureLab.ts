@@ -211,6 +211,9 @@ export interface MaterialMaps {
   normalMap: THREE.Texture;
   roughnessMap: THREE.Texture;
   aoMap?: THREE.Texture;
+  /** Urban presets pack roughness (G) and metalness (B) into one texture. */
+  metalnessMap?: THREE.Texture;
+  emissiveMap?: THREE.Texture;
 }
 
 /**
@@ -542,6 +545,8 @@ export function tile(maps: MaterialMaps, repeat: number, anisotropy = 16): Mater
     roughnessMap: maps.roughnessMap.clone(),
   };
   if (maps.aoMap) out.aoMap = maps.aoMap.clone();
+  if (maps.metalnessMap) out.metalnessMap = maps.metalnessMap === maps.roughnessMap ? out.roughnessMap : maps.metalnessMap.clone();
+  if (maps.emissiveMap) out.emissiveMap = maps.emissiveMap.clone();
   for (const key of Object.keys(out) as (keyof MaterialMaps)[]) {
     const t = out[key];
     if (!t) continue;
@@ -552,4 +557,621 @@ export function tile(maps: MaterialMaps, repeat: number, anisotropy = 16): Mater
     t.needsUpdate = true;
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ */
+/* Single-pass surface bake (urban presets)                            */
+/* ------------------------------------------------------------------ */
+
+/** One texel of a surface: albedo (sRGB 0..1), height, roughness, metalness, emissive. */
+export interface SurfaceTexel {
+  r: number;
+  g: number;
+  b: number;
+  h: number;
+  rough: number;
+  metal: number;
+  er: number;
+  eg: number;
+  eb: number;
+}
+
+export interface SurfaceOptions {
+  size: number;
+  normalStrength: number;
+  emissive?: boolean;
+}
+
+const surfaceCache = new Map<string, MaterialMaps>();
+
+/**
+ * Bakes albedo, normal, roughness+metalness and optionally emissive from ONE
+ * evaluation of the surface function per texel.
+ *
+ * The rural presets above call their noise once per map, which is fine at a
+ * handful of materials. The city needs a dozen, and evaluating fbm three times
+ * per texel for each would triple the load time for identical results. Here the
+ * height lands in a float buffer and the normal is Sobel-derived from it, so
+ * albedo, relief and roughness can never disagree.
+ *
+ * `v` runs top-to-bottom of the bitmap (canvas rows): on a flipY texture v = 0
+ * is the TOP of the tile.
+ */
+export function bakeSurface(key: string, opts: SurfaceOptions, fn: (u: number, v: number, o: SurfaceTexel) => void): MaterialMaps {
+  const fullKey = `${key}@${opts.size}`;
+  const hit = surfaceCache.get(fullKey);
+  if (hit) return hit;
+
+  const { size } = opts;
+  const heights = new Float32Array(size * size);
+  const alb = makeCanvas(size);
+  const orm = makeCanvas(size);
+  const emi = opts.emissive ? makeCanvas(size) : null;
+  const albImg = alb.ctx.createImageData(size, size);
+  const ormImg = orm.ctx.createImageData(size, size);
+  const emiImg = emi ? emi.ctx.createImageData(size, size) : null;
+  const o: SurfaceTexel = { r: 0, g: 0, b: 0, h: 0, rough: 0, metal: 0, er: 0, eg: 0, eb: 0 };
+
+  withBakeResolution(size, () => {
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        o.r = o.g = o.b = 0.5;
+        o.h = 0.5;
+        o.rough = 0.8;
+        o.metal = 0;
+        o.er = o.eg = o.eb = 0;
+        fn(x / size, y / size, o);
+        const idx = y * size + x;
+        const i = idx * 4;
+        heights[idx] = o.h;
+        albImg.data[i] = clamp(o.r, 0, 1) * 255;
+        albImg.data[i + 1] = clamp(o.g, 0, 1) * 255;
+        albImg.data[i + 2] = clamp(o.b, 0, 1) * 255;
+        albImg.data[i + 3] = 255;
+        ormImg.data[i] = 255;
+        ormImg.data[i + 1] = clamp(o.rough, 0.02, 1) * 255;
+        ormImg.data[i + 2] = clamp(o.metal, 0, 1) * 255;
+        ormImg.data[i + 3] = 255;
+        if (emiImg) {
+          emiImg.data[i] = clamp(o.er, 0, 1) * 255;
+          emiImg.data[i + 1] = clamp(o.eg, 0, 1) * 255;
+          emiImg.data[i + 2] = clamp(o.eb, 0, 1) * 255;
+          emiImg.data[i + 3] = 255;
+        }
+      }
+    }
+  });
+
+  alb.ctx.putImageData(albImg, 0, 0);
+  orm.ctx.putImageData(ormImg, 0, 0);
+  const ormTex = finalize(orm.canvas, false, 1, 8);
+  const maps: MaterialMaps = {
+    map: finalize(alb.canvas, true, 1, 8),
+    normalMap: bakeNormalMap(
+      { size, height: (u, v) => heights[Math.round(v * size) % size * size + (Math.round(u * size) % size)] },
+      opts.normalStrength,
+    ),
+    roughnessMap: ormTex,
+    metalnessMap: ormTex,
+  };
+  if (emi && emiImg) {
+    emi.ctx.putImageData(emiImg, 0, 0);
+    maps.emissiveMap = finalize(emi.canvas, true, 1, 8);
+  }
+  surfaceCache.set(fullKey, maps);
+  return maps;
+}
+
+/** Stable 0..1 hash for grid cells (windows, pavers, panels). */
+export function cellHash(i: number, j: number, seed = 0): number {
+  let h = (i * 374761393 + j * 668265263 + seed * 982451653) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967295;
+}
+
+function setRgb(o: SurfaceTexel, c: [number, number, number], k = 1): void {
+  o.r = c[0] * k;
+  o.g = c[1] * k;
+  o.b = c[2] * k;
+}
+
+function mixInto(o: SurfaceTexel, c: [number, number, number], t: number): void {
+  o.r = lerp(o.r, c[0], t);
+  o.g = lerp(o.g, c[1], t);
+  o.b = lerp(o.b, c[2], t);
+}
+
+/** Distance to the nearest grid line, 0 on the line, 0.5 mid-cell. */
+function gridDist(x: number): number {
+  const f = x - Math.floor(x);
+  return Math.min(f, 1 - f);
+}
+
+/* ------------------------------------------------------------------ */
+/* Urban presets                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Wet city asphalt. One tile = 8 m.
+ *
+ * Aggregate speckle + worley cracks + a low-frequency puddle mask. Puddles are
+ * flat in the height field and drop to near-mirror roughness, so the PMREM sky
+ * and every neon sign reflect in them — that reflection is most of what makes
+ * the night shot read as Shibuya instead of a car park.
+ */
+export function wetAsphaltMaps(size = 512): MaterialMaps {
+  const dry = hexToRgb(0x4a5560);
+  const wet = hexToRgb(0x2c353f);
+  const stone = hexToRgb(0x8a929a);
+  const tar = hexToRgb(0x1c2228);
+  return bakeSurface('asphalt.wet', { size, normalStrength: 2.2 }, (u, v, o) => {
+    const patch = tileableFbm(NOISE.stone, u, v, 3, 3);
+    const tone = tileableFbm(NOISE.stone, u + 7, v, 9, 2);
+    const grain = tileableFbm(NOISE.stone, u, v, 90, 2);
+    const w = worley(u, v, 110, 5);
+    const pebble = smoothstep(0.42, 0.12, w.f1) * 0.8;
+    const crackCell = worley(u, v, 5, 17);
+    const crackMask = smoothstep(0.1, 0.35, tileableFbm(NOISE.paint, u, v, 4, 2));
+    const crack = smoothstep(0.035, 0.0, crackCell.f2 - crackCell.f1) * crackMask;
+    const puddle = smoothstep(0.2, 0.34, patch + tone * 0.18);
+    const damp = smoothstep(-0.15, 0.2, patch);
+
+    const t = clamp(0.5 + tone * 0.5 + grain * 0.3, 0, 1);
+    setRgb(o, dry, 0.9 + t * 0.2);
+    mixInto(o, wet, damp * 0.75);
+    mixInto(o, stone, pebble * (1 - puddle) * 0.35);
+    mixInto(o, tar, crack * 0.85);
+    mixInto(o, wet, puddle * 0.5);
+
+    o.h = puddle > 0.5 ? 0.42 : 0.5 + grain * 0.12 + pebble * 0.18 - crack * 0.35;
+    o.rough = lerp(lerp(0.66 + grain * 0.08, 0.34, damp * 0.8), 0.05, puddle);
+  });
+}
+
+/** Worn zebra paint. u runs along the stripe, v across its width (one stripe per tile). */
+export function zebraPaintMaps(size = 256): MaterialMaps {
+  const paint = hexToRgb(0xe8e4dc);
+  const asphalt = hexToRgb(0x3a4450);
+  const dirt = hexToRgb(0x8a847a);
+  return bakeSurface('zebra.paint', { size, normalStrength: 1.6 }, (u, v, o) => {
+    const wear = tileableFbm(NOISE.paint, u, v, 7, 4);
+    const chip = tileableFbm(NOISE.paint, u + 3, v, 38, 2);
+    const holes = smoothstep(0.32, 0.46, wear + chip * 0.35);
+    const edge = 1 - smoothstep(0.0, 0.12, Math.min(v, 1 - v));
+    const tyre = smoothstep(0.25, 0.6, tileableFbm(NOISE.stone, u * 0.3, v, 2, 2) + 0.2) * 0.35;
+    setRgb(o, paint, 0.94 + chip * 0.08);
+    mixInto(o, dirt, Math.max(edge * 0.55, tyre));
+    mixInto(o, asphalt, holes);
+    o.h = 0.62 - holes * 0.2 + chip * 0.04;
+    o.rough = lerp(0.46, 0.7, holes) - tyre * 0.1;
+  });
+}
+
+/**
+ * Square sidewalk pavers with recessed grout. One tile = 2.4 m, 8×8 pavers.
+ * Each paver has its own tone and a soft bevel so grazing sun catches edges.
+ */
+export function sidewalkTileMaps(key: string, tint: number, size = 512, pavers = 8): MaterialMaps {
+  const base = hexToRgb(tint);
+  const grout = hexToRgb(0x6a645c);
+  const stain = hexToRgb(0x7a7068);
+  return bakeSurface(`sidewalk.${key}`, { size, normalStrength: 2.6 }, (u, v, o) => {
+    const x = u * pavers;
+    const y = v * pavers;
+    const i = Math.floor(x);
+    const j = Math.floor(y);
+    const d = Math.min(gridDist(x), gridDist(y));
+    const joint = smoothstep(0.035, 0.012, d);
+    const bevel = smoothstep(0.012, 0.09, d);
+    const jitter = cellHash(i % pavers, j % pavers, 3);
+    const grain = tileableFbm(NOISE.stone, u, v, 70, 2);
+    const blot = smoothstep(0.15, 0.45, tileableFbm(NOISE.soil, u, v, 5, 3));
+    setRgb(o, base, 0.9 + jitter * 0.16 + grain * 0.08);
+    mixInto(o, stain, blot * 0.35);
+    mixInto(o, grout, joint);
+    o.h = 0.3 + bevel * 0.5 + grain * 0.06;
+    o.rough = 0.78 - blot * 0.18 + joint * 0.1;
+  });
+}
+
+/** Running-bond red brick pavers (sidewalk strips in the golden reference). */
+export function brickPaverMaps(size = 512): MaterialMaps {
+  const brick = hexToRgb(0x9a5a48);
+  const dark = hexToRgb(0x6a3a30);
+  const grout = hexToRgb(0x8a8078);
+  const rows = 16;
+  const cols = 8;
+  return bakeSurface('brick.paver', { size, normalStrength: 2.4 }, (u, v, o) => {
+    const y = v * rows;
+    const j = Math.floor(y);
+    const x = u * cols + (j % 2) * 0.5;
+    const i = Math.floor(x);
+    const d = Math.min(gridDist(x) * 2, gridDist(y));
+    const joint = smoothstep(0.06, 0.025, d);
+    const bevel = smoothstep(0.025, 0.14, d);
+    const jitter = cellHash(i % cols, j % rows, 9);
+    const grain = tileableFbm(NOISE.stone, u, v, 60, 2);
+    setRgb(o, brick, 0.85 + grain * 0.1);
+    mixInto(o, dark, jitter * 0.5);
+    mixInto(o, grout, joint);
+    o.h = 0.3 + bevel * 0.5 + grain * 0.05;
+    o.rough = 0.72 + joint * 0.12;
+  });
+}
+
+/**
+ * Precast concrete panels, 1.5 m × 1 m in a 3 m tile (2×3 panels), with
+ * recessed joints, form-tie holes and vertical rain streaks.
+ */
+export function concretePanelMaps(key: string, tint: number, size = 512): MaterialMaps {
+  const base = hexToRgb(tint);
+  const streakC = hexToRgb(0x5a5c62);
+  return bakeSurface(`concrete.${key}`, { size, normalStrength: 2.0 }, (u, v, o) => {
+    const x = u * 2;
+    const y = v * 3;
+    const px = x - Math.floor(x);
+    const py = y - Math.floor(y);
+    const d = Math.min(gridDist(x), gridDist(y) * 0.66);
+    const joint = smoothstep(0.018, 0.006, d);
+    let tie = 0;
+    for (const tx of [0.2, 0.8]) for (const ty of [0.25, 0.75]) tie = Math.max(tie, smoothstep(0.03, 0.012, Math.hypot((px - tx) * 1.5, py - ty)));
+    const pore = tileableFbm(NOISE.stone, u, v, 80, 2);
+    const streak = smoothstep(0.1, 0.55, tileableFbm(NOISE.water, u * 6, v * 0.35, 6, 3)) * (0.4 + py * 0.6);
+    const panelTone = cellHash(Math.floor(x) % 2, Math.floor(y) % 3, 21);
+    setRgb(o, base, 0.9 + panelTone * 0.12 + pore * 0.06);
+    mixInto(o, streakC, streak * 0.4);
+    mixInto(o, streakC, Math.max(joint, tie) * 0.8);
+    o.h = 0.6 - joint * 0.5 - tie * 0.4 + pore * 0.05;
+    o.rough = 0.84 - streak * 0.12;
+  });
+}
+
+export type WindowStyle = 'punched' | 'ribbon';
+
+export interface FacadeOptions {
+  wall: number;
+  frame?: number;
+  glass?: number;
+  /** Windows per tile horizontally / floors per tile. */
+  cols?: number;
+  rows?: number;
+  /** Window size as a fraction of its cell. */
+  winW?: number;
+  winH?: number;
+  style?: WindowStyle;
+  /** Fraction of windows with lights on at night. */
+  lit?: number;
+  seed?: number;
+}
+
+const INTERIORS: [number, number, number][] = [
+  hexToRgb(0xffd8a0),
+  hexToRgb(0xffe8c8),
+  hexToRgb(0xf0f4ff),
+  hexToRgb(0xffc080),
+  hexToRgb(0xd8e8ff),
+];
+
+/**
+ * Window-grid facade module. One tile = `cols` windows × `rows` floors; UVs
+ * are laid out in metres by the FacadeKit so a tile is ~3 m per window and
+ * 3.5 m per floor.
+ *
+ * Every cell gets its own interior (warm / cool / off, blinds half down), so
+ * repetition is broken per window rather than per tile. The emissive map holds
+ * only the interior colour of lit cells; NeonMaterials scales it with the hour.
+ */
+export function facadeWindowGridMaps(key: string, f: FacadeOptions, size = 512): MaterialMaps {
+  const cols = f.cols ?? 4;
+  const rows = f.rows ?? 4;
+  const winW = f.winW ?? 0.62;
+  const winH = f.winH ?? 0.56;
+  const style = f.style ?? 'punched';
+  const lit = f.lit ?? 0.55;
+  const seed = f.seed ?? 1;
+  const wall = hexToRgb(f.wall);
+  const frame = hexToRgb(f.frame ?? 0x3a3c44);
+  const glass = hexToRgb(f.glass ?? 0x2a3a4e);
+  const grime = hexToRgb(0x4a4a52);
+  return bakeSurface(`facade.${key}`, { size, normalStrength: 2.4, emissive: true }, (u, v, o) => {
+    const cx = u * cols;
+    const cy = v * rows;
+    const i = Math.floor(cx);
+    const j = Math.floor(cy);
+    const lx = cx - i;
+    const ly = cy - j;
+    const pore = tileableFbm(NOISE.stone, u, v, 60, 2);
+    const stain = smoothstep(0.05, 0.5, tileableFbm(NOISE.water, u * 4, v * 0.5, 4, 3));
+
+    setRgb(o, wall, 0.92 + pore * 0.08);
+    mixInto(o, grime, stain * 0.22);
+    o.h = 0.62 + pore * 0.04;
+    o.rough = 0.82;
+
+    // Floor slab line under each storey.
+    const slab = smoothstep(0.035, 0.015, Math.abs(ly - 0.97));
+    mixInto(o, grime, slab * 0.35);
+    o.h -= slab * 0.12;
+
+    const hw = style === 'ribbon' ? 0.49 : winW * 0.5;
+    const hh = winH * 0.5;
+    const dx = Math.abs(lx - 0.5);
+    const dy = Math.abs(ly - 0.45);
+    const inWin = dx < hw && dy < hh;
+    const frameW = 0.035;
+    const inFrame = dx < hw + frameW && dy < hh + frameW && !inWin;
+    const sill = dx < hw + frameW * 1.6 && ly > 0.45 + hh + frameW && ly < 0.45 + hh + frameW * 2.4;
+
+    if (sill) {
+      setRgb(o, wall, 1.08);
+      o.h = 0.85;
+      o.rough = 0.6;
+    }
+    if (inFrame) {
+      setRgb(o, frame);
+      o.h = 0.5;
+      o.rough = 0.38;
+      o.metal = 0.7;
+    }
+    if (inWin) {
+      const h = cellHash(i % cols, j % rows, seed);
+      const h2 = cellHash(i % cols, j % rows, seed + 7);
+      // Mullion splitting each window in two (or thirds on ribbon glazing).
+      const mullions = style === 'ribbon' ? 3 : 2;
+      const mx = ((lx - (0.5 - hw)) / (hw * 2)) * mullions;
+      const mullion = smoothstep(0.03, 0.012, gridDist(mx)) * (mx > 0.05 && mx < mullions - 0.05 ? 1 : 0);
+      const blind = ly - (0.45 - hh) < h2 * winH * 0.8;
+      const sky = 1 - (ly - (0.45 - hh)) / (hh * 2);
+      setRgb(o, glass, 0.85 + sky * 0.3);
+      o.h = 0.2;
+      o.rough = 0.06 + h2 * 0.06;
+      o.metal = 0.55;
+      if (h < lit) {
+        const c = INTERIORS[Math.floor(h2 * INTERIORS.length) % INTERIORS.length];
+        const k = blind ? 0.35 : 0.95;
+        o.er = c[0] * k;
+        o.eg = c[1] * k;
+        o.eb = c[2] * k;
+      }
+      if (blind) {
+        mixInto(o, hexToRgb(0xd8d0c0), 0.55);
+        o.rough = 0.7;
+        o.metal = 0;
+      }
+      if (mullion > 0) {
+        setRgb(o, frame);
+        o.h = 0.45;
+        o.rough = 0.4;
+        o.metal = 0.7;
+        o.er = o.eg = o.eb = 0;
+      }
+    }
+  });
+}
+
+/**
+ * Glass curtain wall: 1.5 m panes, 3.5 m floors, opaque spandrel band at each
+ * slab, ceiling-light strips glowing behind the glass. One tile = 4 panes × 3 floors.
+ */
+export function glassCurtainMaps(key: string, tint: number, spandrel: number, size = 512): MaterialMaps {
+  const glass = hexToRgb(tint);
+  const band = hexToRgb(spandrel);
+  const mull = hexToRgb(0x4a505a);
+  const cols = 4;
+  const rows = 3;
+  return bakeSurface(`curtain.${key}`, { size, normalStrength: 1.4, emissive: true }, (u, v, o) => {
+    const cx = u * cols;
+    const cy = v * rows;
+    const i = Math.floor(cx);
+    const j = Math.floor(cy);
+    const ly = cy - j;
+    const pane = cellHash(i % cols, j % rows, 31);
+    setRgb(o, glass, 0.85 + pane * 0.25 + (1 - ly) * 0.12);
+    o.h = 0.4;
+    o.rough = 0.04 + pane * 0.07;
+    o.metal = 0.75;
+    const lights = pane > 0.25;
+    if (lights) {
+      const strip = smoothstep(0.06, 0.0, Math.abs(ly - 0.12)) * 0.9 + 0.18 * (1 - ly);
+      const c = INTERIORS[Math.floor(pane * 97) % INTERIORS.length];
+      o.er = c[0] * strip;
+      o.eg = c[1] * strip;
+      o.eb = c[2] * strip;
+    }
+    if (ly > 0.84) {
+      setRgb(o, band, 0.95 + pane * 0.05);
+      o.h = 0.55;
+      o.rough = 0.5;
+      o.metal = 0.2;
+      o.er = o.eg = o.eb = 0;
+    }
+    const m = Math.min(gridDist(cx), gridDist(cy) * 0.5);
+    if (m < 0.018) {
+      setRgb(o, mull);
+      o.h = 0.7;
+      o.rough = 0.35;
+      o.metal = 0.9;
+      o.er = o.eg = o.eb = 0;
+    }
+  });
+}
+
+export type MetalFinish = 'brushed' | 'corrugated' | 'painted';
+
+/** Metal panels for poles, shutters, vending machines, signal housings. One tile = 1 m. */
+export function metalPanelMaps(key: string, tint: number, finish: MetalFinish = 'painted', size = 256): MaterialMaps {
+  const base = hexToRgb(tint);
+  const rust = hexToRgb(0x5a4a40);
+  return bakeSurface(`metal.${key}.${finish}`, { size, normalStrength: finish === 'corrugated' ? 3.0 : 1.2 }, (u, v, o) => {
+    const brush = tileableFbm(NOISE.stone, u * 0.2, v * 6, 30, 2);
+    const scuff = smoothstep(0.2, 0.5, tileableFbm(NOISE.paint, u, v, 6, 3));
+    const seam = smoothstep(0.012, 0.004, gridDist(v * 2));
+    const rivet = smoothstep(0.02, 0.008, Math.hypot(gridDist(u * 4) * 0.5, gridDist(v * 2 + 0.06) * 0.5));
+    setRgb(o, base, 0.94 + brush * 0.08);
+    o.h = 0.5 + brush * 0.05 - seam * 0.3 + rivet * 0.3;
+    o.metal = finish === 'painted' ? 0.25 : 0.85;
+    o.rough = finish === 'brushed' ? 0.32 + brush * 0.08 : 0.45 + scuff * 0.2;
+    if (finish === 'corrugated') {
+      const wave = Math.sin(u * Math.PI * 2 * 24);
+      o.h = 0.5 + wave * 0.35;
+      setRgb(o, base, 0.92 + wave * 0.06);
+    }
+    mixInto(o, rust, scuff * (finish === 'brushed' ? 0.05 : 0.18));
+  });
+}
+
+/** Small ceramic mosaic tiles (Japanese podium facade), glossy with dark grout. One tile = 1 m. */
+export function tileFacadeMaps(key: string, tint: number, size = 512): MaterialMaps {
+  const base = hexToRgb(tint);
+  const grout = hexToRgb(0x5a5850);
+  return bakeSurface(`tilefacade.${key}`, { size, normalStrength: 2.2 }, (u, v, o) => {
+    const x = u * 10;
+    const y = v * 20;
+    const i = Math.floor(x);
+    const j = Math.floor(y);
+    const d = Math.min(gridDist(x), gridDist(y) * 0.5);
+    const joint = smoothstep(0.05, 0.02, d);
+    const jitter = cellHash(i % 10, j % 20, 13);
+    setRgb(o, base, 0.88 + jitter * 0.18);
+    mixInto(o, grout, joint);
+    o.h = 0.35 + smoothstep(0.02, 0.1, d) * 0.45;
+    o.rough = lerp(0.22 + jitter * 0.12, 0.85, joint);
+  });
+}
+
+/** Round leaf clumps for tree canopies. */
+export function foliageMaps(size = 256): MaterialMaps {
+  const dark = hexToRgb(0x2e6840);
+  const light = hexToRgb(0x6aaa58);
+  return bakeSurface('foliage', { size, normalStrength: 3.0 }, (u, v, o) => {
+    const w = worley(u, v, 14, 41);
+    const leaf = smoothstep(0.6, 0.1, w.f1);
+    const tone = tileableFbm(NOISE.grass, u, v, 5, 3);
+    const hue = (w.id % 1000) / 1000;
+    setRgb(o, dark);
+    mixInto(o, light, clamp(leaf * 0.7 + tone * 0.4 + hue * 0.2, 0, 1));
+    o.h = leaf;
+    o.rough = 0.7 - leaf * 0.15;
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/* LED screens                                                         */
+/* ------------------------------------------------------------------ */
+
+export interface LedScreen {
+  texture: THREE.CanvasTexture;
+  /** Redraws the frame; call at the screen refresh rate (NeonMaterials throttles). */
+  update(t: number): void;
+}
+
+export interface LedScreenOptions {
+  width: number;
+  height: number;
+  seed: number;
+  palette: number[];
+  /** Big headline for procedural ads. */
+  text?: string;
+  /** Imagine still used as screen content (allowed by ART_DIRECTION §9). */
+  imageUrl?: string;
+}
+
+const hexCss = (h: number) => `#${h.toString(16).padStart(6, '0')}`;
+
+/**
+ * Animated LED screen as a CanvasTexture. Content is a slow procedural ad
+ * (colour fields + headline) or an Imagine still with a Ken Burns drift; both
+ * get a sub-pixel grid and a travelling scan band so the screen reads as
+ * diodes, not a poster.
+ */
+export function ledScreenTexture(opts: LedScreenOptions): LedScreen {
+  const { width: w, height: h, palette, text, seed } = opts;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const g = canvas.getContext('2d')!;
+
+  const grid = document.createElement('canvas');
+  grid.width = 4;
+  grid.height = 4;
+  const gg = grid.getContext('2d')!;
+  gg.fillStyle = 'rgba(0,0,0,0.0)';
+  gg.fillRect(0, 0, 4, 4);
+  gg.fillStyle = 'rgba(0,0,0,0.42)';
+  gg.fillRect(3, 0, 1, 4);
+  gg.fillRect(0, 3, 4, 1);
+  const gridPattern = g.createPattern(grid, 'repeat')!;
+
+  let image: HTMLImageElement | null = null;
+  if (opts.imageUrl) {
+    const img = new Image();
+    img.onload = () => (image = img);
+    img.src = opts.imageUrl;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
+  texture.anisotropy = 4;
+
+  const phase = (seed % 97) / 97;
+  const update = (t: number) => {
+    const tt = t * 0.25 + phase * 10;
+    const slide = Math.floor(tt / 2.5);
+    const c0 = palette[slide % palette.length];
+    const c1 = palette[(slide + 1) % palette.length];
+    if (image) {
+      const s = 1.08 + Math.sin(tt * 0.6) * 0.04;
+      const iw = image.width;
+      const ih = image.height;
+      const scale = Math.max(w / iw, h / ih) * s;
+      const dw = iw * scale;
+      const dh = ih * scale;
+      g.drawImage(image, (w - dw) / 2 + Math.sin(tt * 0.4) * w * 0.03, (h - dh) / 2, dw, dh);
+    } else {
+      const grad = g.createLinearGradient(0, 0, w, h);
+      grad.addColorStop(0, hexCss(c0));
+      grad.addColorStop(1, hexCss(c1));
+      g.fillStyle = grad;
+      g.fillRect(0, 0, w, h);
+      for (let k = 0; k < 3; k++) {
+        const bx = (Math.sin(tt * (0.7 + k * 0.3) + k * 2 + seed) * 0.5 + 0.5) * w;
+        const by = (Math.cos(tt * (0.5 + k * 0.2) + k) * 0.5 + 0.5) * h;
+        const rg = g.createRadialGradient(bx, by, 0, bx, by, h * 0.8);
+        rg.addColorStop(0, 'rgba(255,255,255,0.55)');
+        rg.addColorStop(1, 'rgba(255,255,255,0)');
+        g.fillStyle = rg;
+        g.fillRect(0, 0, w, h);
+      }
+      if (text) {
+        let size = Math.floor(h * 0.46);
+        g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
+        const fit = (w * 0.86) / Math.max(1, g.measureText(text).width);
+        if (fit < 1) {
+          size = Math.floor(size * fit);
+          g.font = `900 ${size}px "Arial Black", Arial, sans-serif`;
+        }
+        g.textAlign = 'center';
+        g.textBaseline = 'middle';
+        g.fillStyle = 'rgba(10,10,20,0.35)';
+        g.fillText(text, w / 2 + 3, h / 2 + 4);
+        g.fillStyle = '#fffaf0';
+        g.fillText(text, w / 2, h / 2);
+      }
+    }
+    const band = ((t * 0.35 + phase) % 1) * (h + 40) - 20;
+    const sg = g.createLinearGradient(0, band - 20, 0, band + 20);
+    sg.addColorStop(0, 'rgba(255,255,255,0)');
+    sg.addColorStop(0.5, 'rgba(255,255,255,0.12)');
+    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = sg;
+    g.fillRect(0, band - 20, w, 40);
+    g.fillStyle = gridPattern;
+    g.fillRect(0, 0, w, h);
+    texture.needsUpdate = true;
+  };
+  update(0);
+  return { texture, update };
 }
