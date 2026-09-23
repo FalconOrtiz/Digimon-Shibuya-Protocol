@@ -21,6 +21,9 @@ npx playwright install chromium   # solo para capturas y visual gate
 npm run dev                       # http://127.0.0.1:5173
 ```
 
+Parámetros de URL: `?hour=21.5` arranca a esa hora (17 = golden, 21.5 = noche neón) y
+`&freeze` detiene el ciclo día/noche. Noche fija: <http://127.0.0.1:5173/?hour=21.5&freeze>.
+
 ## Controles
 
 | Tecla | Exploración | Combate |

@@ -96,6 +96,7 @@ export class Atmosphere implements GameSystem {
     const params = new URLSearchParams(location.search);
     const urlHour = params.get('hour');
     this.hour = urlHour !== null ? Number(urlHour) : ctx.config.world.startHour;
+    this.frozen = params.has('freeze');
     this.cycleSeconds = ctx.config.world.cycleSeconds;
     this.centre.set(PLAY_AREA.cx, (PLAY_AREA.minY + PLAY_AREA.maxY) * 0.5, PLAY_AREA.cz);
 
