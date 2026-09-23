@@ -22,11 +22,19 @@ export class DigimonAnimator {
   private readonly pose: THREE.Object3D;
   private readonly creature: Creature;
   private readonly height: number;
+  private phase = 0;
+  private gaitWeight = 0;
+  private speed = -1;
 
   constructor(readonly model: THREE.Object3D) {
     this.pose = model.userData.pose as THREE.Object3D;
     this.creature = model.userData.creature as Creature;
     this.height = (model.userData.height as number) ?? 1;
+  }
+
+  /** Ground speed in m/s so the step cadence matches travel; -1 = fixed cadence. */
+  setSpeed(mps: number): void {
+    this.speed = mps;
   }
 
   play(state: AnimState, duration = 0.5, onDone: (() => void) | null = null): void {
@@ -40,16 +48,30 @@ export class DigimonAnimator {
   update(dt: number): void {
     this.elapsed += dt;
     this.t += dt;
+    const h = this.height;
+    const walking = this.state === 'walk';
+    const legged = !!this.creature.gait;
+    const run = this.speed < 0 ? 0 : Math.min(1, Math.max(0, (this.speed - 2.2) / 3));
+    if (legged) {
+      // One cycle covers two steps of ~0.21·h each, capped at a scamper.
+      const cycles = this.speed < 0 ? 1.6 : Math.min(3.4, this.speed / (h * 0.42 * (1 + run * 0.5)));
+      this.gaitWeight += ((walking ? 1 : 0) - this.gaitWeight) * Math.min(1, dt * 8);
+      this.phase = (this.phase + dt * cycles * Math.PI * 2) % (Math.PI * 2);
+      this.creature.gait!(this.phase, this.gaitWeight, run);
+    }
     this.creature.update(dt, this.elapsed);
     const u = Math.min(1, this.t / this.duration);
     const p = this.pose;
-    const h = this.height;
     p.position.set(0, 0, 0);
     p.rotation.set(0, 0, 0);
     p.scale.setScalar(1);
 
     switch (this.state) {
       case 'walk': {
+        if (legged) {
+          p.rotation.x = 0.06 + run * 0.1;
+          break;
+        }
         const ph = this.t * 9;
         p.position.y = Math.abs(Math.sin(ph)) * h * 0.05;
         p.rotation.z = Math.sin(ph) * 0.06;

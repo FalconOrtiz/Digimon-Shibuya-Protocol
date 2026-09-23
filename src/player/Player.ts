@@ -80,6 +80,16 @@ export class Player implements GameSystem {
     this.vel.set(0, 0, 0);
     this.yaw = yaw;
     this.pitch = 0;
+    this.updateFollowAnchor();
+  }
+
+  private updateFollowAnchor(): void {
+    const right = this.yaw + Math.PI / 2;
+    this.followAnchor.set(
+      this.pos.x + Math.sin(right) * 1.35 - Math.sin(this.yaw) * 1.6,
+      this.pos.y - this.height,
+      this.pos.z + Math.cos(right) * 1.35 - Math.cos(this.yaw) * 1.6,
+    );
   }
 
   fixedUpdate(h: number, ctx: Ctx): void {
@@ -181,17 +191,13 @@ export class Player implements GameSystem {
     this.stride += ((moving > 0.4 && this.onGround ? 1 : 0) - this.stride) * Math.min(1, dt * 10);
     poseTrainer(this.mesh, chibiPose(this.bob * 2, this.stride, this.pose));
 
-    const right = this.yaw + Math.PI / 2;
-    this.followAnchor.set(
-      this.pos.x + Math.sin(right) * 1.35 - Math.sin(this.yaw) * 1.6,
-      feetY,
-      this.pos.z + Math.cos(right) * 1.35 - Math.cos(this.yaw) * 1.6,
-    );
+    this.updateFollowAnchor();
 
     if (ctx.peek<{ running: boolean }>('battle')?.running) return;
     const cam = ctx.camera;
     cam.rotation.order = 'YXZ';
     if (this.viewMode === 'trainer') {
+      const right = this.yaw + Math.PI / 2;
       const back = 2.6;
       const side = 0.45;
       cam.position.set(

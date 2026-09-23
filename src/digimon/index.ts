@@ -31,6 +31,11 @@ export interface WildMember {
   level: number;
 }
 
+/** Follow slot: arrival radius, top speed (player sprint ≈ 7.1 m/s), teleport past this. */
+const FOLLOW_ARRIVE = 0.15;
+const FOLLOW_MAX_SPEED = 8;
+const FOLLOW_TELEPORT = 14;
+
 interface PlayerLike {
   pos: THREE.Vector3;
   yaw: number;
@@ -53,6 +58,7 @@ export class DigimonSystem implements GameSystem {
   private trainer!: TrainerLike;
   /** true = otro sistema (combate, captura) controla la pose del activo. */
   private pinned = false;
+  private followSpeed = 0;
 
   init(ctx: Ctx): this {
     this.ctx = ctx;
@@ -179,6 +185,8 @@ export class DigimonSystem implements GameSystem {
     const m = this.getActive();
     if (m !== this.active) this.setActive(m);
     this.pinned = true;
+    this.followSpeed = 0;
+    if (m.anim.state === 'walk') m.anim.play('idle', 0.4);
     m.model.position.copy(at);
     m.model.rotation.set(0, yaw, 0);
     return m;
@@ -209,18 +217,30 @@ export class DigimonSystem implements GameSystem {
     if (!this.pinned) {
       const p = this.player.pos;
       const anchor = this.player.followAnchor;
-      const tx = anchor ? anchor.x : p.x;
-      const tz = anchor ? anchor.z : p.z;
-      const k = Math.min(1, 4 * dt);
-      const moving = Math.abs(tx - m.position.x) + Math.abs(tz - m.position.z) > 0.05;
-      m.position.x += (tx - m.position.x) * k;
-      m.position.z += (tz - m.position.z) * k;
+      const dx = (anchor ? anchor.x : p.x) - m.position.x;
+      const dz = (anchor ? anchor.z : p.z) - m.position.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist > FOLLOW_TELEPORT) {
+        this.snapToPlayer();
+        this.followSpeed = 0;
+      } else {
+        // Walks to the slot and eases in as it arrives, instead of gliding.
+        const want = dist > FOLLOW_ARRIVE ? Math.min(FOLLOW_MAX_SPEED, (dist - FOLLOW_ARRIVE) * 3.2 + 0.8) : 0;
+        this.followSpeed += (want - this.followSpeed) * Math.min(1, 7 * dt);
+        if (dist > 1e-4) {
+          const step = Math.min(dist, this.followSpeed * dt);
+          m.position.x += (dx / dist) * step;
+          m.position.z += (dz / dist) * step;
+        }
+      }
       m.position.y = groundHeightAt(m.position.x, m.position.z);
-      const targetYaw = this.player.yaw + Math.PI + 1.05;
-      m.rotation.y += wrapAngle(targetYaw - m.rotation.y) * Math.min(1, 6 * dt);
       const anim = this.active.anim;
-      if (moving && anim.state === 'idle') anim.play('walk', 0.6);
-      else if (!moving && anim.state === 'walk') anim.play('idle', 0.4);
+      const walking = anim.state === 'walk' ? this.followSpeed > 0.25 : this.followSpeed > 0.5;
+      const faceYaw = walking && dist > 0.05 ? Math.atan2(dx, dz) : this.player.yaw + Math.PI + 1.05;
+      m.rotation.y += wrapAngle(faceYaw - m.rotation.y) * Math.min(1, (walking ? 9 : 5) * dt);
+      anim.setSpeed(this.followSpeed);
+      if (walking && anim.state === 'idle') anim.play('walk', 0.6);
+      else if (!walking && anim.state === 'walk') anim.play('idle', 0.4);
     }
     for (const member of this.party) if (member.model.visible) member.anim.update(dt);
   }

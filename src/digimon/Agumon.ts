@@ -116,18 +116,6 @@ export function buildAgumon(): Creature {
     // armpit notch keeps the arms from fusing into the chest
     { x: 0.114, y: 0.262, z: 0.030, r: 0.030, sx: 0.8, sy: 1.2, strength: -0.30 },
     { x: -0.114, y: 0.262, z: 0.030, r: 0.030, sx: 0.8, sy: 1.2, strength: -0.30 },
-
-    // legs: thick thigh -> short shin -> big foot
-    { x: 0.078, y: 0.100, z: 0.004, r: 0.070 },
-    { x: -0.078, y: 0.100, z: 0.004, r: 0.070 },
-    { x: 0.082, y: 0.056, z: 0.014, r: 0.052 },
-    { x: -0.082, y: 0.056, z: 0.014, r: 0.052 },
-    { x: 0.084, y: 0.024, z: 0.000, r: 0.046, sy: 0.56, sz: 0.90 },       // heel
-    { x: -0.084, y: 0.024, z: 0.000, r: 0.046, sy: 0.56, sz: 0.90 },
-    { x: 0.086, y: 0.022, z: 0.044, r: 0.046, sy: 0.50, sz: 1.00 },       // ball of the foot
-    { x: -0.086, y: 0.022, z: 0.044, r: 0.046, sy: 0.50, sz: 1.00 },
-    // crotch notch
-    { x: 0, y: 0.050, z: 0.012, r: 0.058, sx: 0.44, sz: 1.5, strength: -0.62 },
   ];
 
   const BODY_RES = 44;
@@ -154,32 +142,64 @@ export function buildAgumon(): Creature {
   body.receiveShadow = true;
   rig.body.add(body);
 
-  const probeBody = makeSurfaceProbe(bodyGeo);
-  const clawAt = (geo: THREE.BufferGeometry, origin: THREE.Vector3, dir: THREE.Vector3, tilt: THREE.Euler) => {
-    const hit = probeBody(origin, dir);
+  const clawAt = (
+    probe: ReturnType<typeof makeSurfaceProbe>, parent: THREE.Object3D,
+    geo: THREE.BufferGeometry, origin: THREE.Vector3, dir: THREE.Vector3, tilt: THREE.Euler,
+  ) => {
+    const hit = probe(origin, dir);
     if (!hit) return;
     const c = new THREE.Mesh(geo, clawMat);
     c.position.copy(hit.point).addScaledVector(hit.normal, -0.004);
     c.rotation.copy(tilt);
     c.castShadow = true;
-    rig.body.add(c);
+    parent.add(c);
   };
+  const probeBody = makeSurfaceProbe(bodyGeo);
 
-  // Three toe claws per foot, fanned across the front of the foot.
-  const footClaw = clawGeometry(0.030, 0.0105);
-  for (const s of [1, -1]) {
-    for (const off of [-1, 0, 1]) {
-      const x = s * 0.086 + off * 0.026;
-      clawAt(footClaw, new THREE.Vector3(x, 0.016, 0.02), new THREE.Vector3(off * 0.25, 0, 1),
-        new THREE.Euler(Math.PI * 0.60, off * 0.25, 0));
-    }
-  }
   // Three finger claws per hand, pointing down and in.
   const handClaw = clawGeometry(0.026, 0.0085);
   for (const s of [1, -1]) {
     for (const off of [-1, 0, 1]) {
-      clawAt(handClaw, new THREE.Vector3(s * 0.172, 0.222, 0.064 + off * 0.016), new THREE.Vector3(s * 0.25, -1, off * 0.35),
+      clawAt(probeBody, rig.body, handClaw, new THREE.Vector3(s * 0.172, 0.222, 0.064 + off * 0.016), new THREE.Vector3(s * 0.25, -1, off * 0.35),
         new THREE.Euler(Math.PI * 0.94 - off * 0.25, 0, -s * 0.35));
+    }
+  }
+
+  /* ---- Legs -------------------------------------------------------- */
+  // Separate sculpts pivoting at the hip so the walk cycle can swing them.
+  // The thigh ball is centred on the pivot, so the joint silhouette holds at
+  // any angle. Coordinates are relative to the pivot.
+  const HIP_Y = 0.100;
+  const legs: THREE.Group[] = [];
+  const footClaw = clawGeometry(0.030, 0.0105);
+  for (const s of [1, -1]) {
+    const legBalls: Ball[] = [
+      { x: 0, y: 0, z: 0, r: 0.070 },                                        // thigh
+      { x: s * 0.004, y: -0.044, z: 0.010, r: 0.052 },                       // shin
+      { x: s * 0.006, y: -0.076, z: -0.004, r: 0.046, sy: 0.56, sz: 0.90 },  // heel
+      { x: s * 0.008, y: -0.078, z: 0.040, r: 0.046, sy: 0.50, sz: 1.00 },   // ball of the foot
+    ];
+    let legGeo = metaSurface(legBalls, { resolution: 30, smooth: 0.86, padding: 0.03 });
+    fixOutward(legGeo, 'agumon-leg');
+    legGeo = weldDecimate(legGeo, BODY_FACET);
+    legGeo.setAttribute('uv', boxProjectedUV(legGeo, 17));
+    markSculpt(legGeo, new THREE.Vector3(0, -0.04, 0), () => -1, 0.22, 1);
+
+    const leg = new THREE.Group();
+    leg.name = s > 0 ? 'legL' : 'legR';
+    leg.position.set(s * 0.078, HIP_Y, 0.004);
+    const legMesh = new THREE.Mesh(legGeo, painted);
+    legMesh.castShadow = true;
+    legMesh.receiveShadow = true;
+    leg.add(legMesh);
+    rig.body.add(leg);
+    legs.push(leg);
+
+    // Three toe claws fanned across the front of the foot.
+    const probeLeg = makeSurfaceProbe(legGeo);
+    for (const off of [-1, 0, 1]) {
+      clawAt(probeLeg, leg, footClaw, new THREE.Vector3(s * 0.008 + off * 0.026, -0.084, 0.02), new THREE.Vector3(off * 0.25, 0, 1),
+        new THREE.Euler(Math.PI * 0.60, off * 0.25, 0));
     }
   }
 
@@ -338,6 +358,9 @@ export function buildAgumon(): Creature {
   const anim = new IdleAnimator(rig, 33);
   const rnd = makeRng(404);
   let attention = 0;
+  let gPhase = 0;
+  let gWeight = 0;
+  let gRun = 0;
 
   return {
     id: 'agumon',
@@ -345,12 +368,31 @@ export function buildAgumon(): Creature {
     group: rig.root,
     get attention() { return attention; },
     set attention(v: number) { attention = clamp(v, 0, 1); },
+    gait(phase, weight, run) {
+      gPhase = phase;
+      gWeight = weight;
+      gRun = run;
+    },
     update(dt, elapsed) {
       anim.update(dt, elapsed, attention);
-      tail.rotation.y = Math.sin(elapsed * 0.82) * (0.09 + attention * 0.09);
-      tail.rotation.x = Math.sin(elapsed * 1.1 + 0.6) * 0.045;
+      const w = gWeight;
+      const sin = Math.sin(gPhase);
+      const cos = Math.cos(gPhase);
+      const swing = (0.46 + gRun * 0.22) * sin * w;
+      const lift = (0.020 + gRun * 0.014) * w;
+      // Left leg swings forward while cos < 0, the right one on the other half.
+      legs[0].rotation.x = swing;
+      legs[1].rotation.x = -swing;
+      legs[0].position.y = HIP_Y + Math.max(0, -cos) * lift;
+      legs[1].position.y = HIP_Y + Math.max(0, cos) * lift;
+      // Drop the hips by exactly what the planted leg loses to its angle.
+      const dip = HIP_Y * (1 - Math.cos(swing));
+      rig.body.position.y = Math.sin(elapsed * 1.3) * 0.004 * (1 - w) - dip;
+      rig.body.rotation.z += sin * 0.07 * w;
+      rig.body.rotation.y = sin * 0.10 * w;
+      tail.rotation.y = Math.sin(elapsed * 0.82) * (0.09 + attention * 0.09) * (1 - w) - sin * 0.22 * w;
+      tail.rotation.x = Math.sin(elapsed * 1.1 + 0.6) * 0.045 + w * 0.08;
       tail.rotation.z = Math.sin(elapsed * 1.7) * 0.04;
-      rig.body.position.y = Math.sin(elapsed * 1.3) * 0.004;
       void rnd;
     },
     celebrate: () => anim.celebrate(),

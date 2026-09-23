@@ -50,6 +50,12 @@ export interface Creature {
   readonly name: string;
   readonly group: THREE.Group;
   update(dt: number, elapsed: number): void;
+  /**
+   * Legged walk cycle, applied on the next `update`. `phase` in radians (one
+   * full turn = two steps), `weight` 0..1 blends from idle, `run` 0..1 widens
+   * the stride. Creatures without it fall back to the pose-level bob.
+   */
+  gait?(phase: number, weight: number, run: number): void;
   celebrate(): void;
   /** 0..1 — raised while the player is looking at this creature. */
   attention: number;
