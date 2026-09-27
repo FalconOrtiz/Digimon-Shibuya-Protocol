@@ -1,0 +1,165 @@
+// Gold shots (ART_DIRECTION §1). Each shot freezes the clock and poses the
+// player / camera so captures are reproducible frame to frame.
+
+import * as THREE from 'three';
+import type { Ctx } from '../core/Context';
+
+export interface ShotPose {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  fov: number;
+}
+
+export interface Shot {
+  label: string;
+  /** Returns a fixed camera pose, or null to keep the player camera. */
+  apply(ctx: Ctx): ShotPose | null;
+}
+
+export const GOLDEN_HOUR = 17.0;
+export const NIGHT_HOUR = 21.5;
+
+function setHour(ctx: Ctx, hour: number): void {
+  const dn = ctx.scene.userData.dayNight as { setHour(h: number): void; freeze(on: boolean): void } | undefined;
+  dn?.setHour(hour);
+  dn?.freeze(true);
+}
+
+/** Portraits clear the crossing so passers-by never walk through the frame. */
+function showCrowd(ctx: Ctx, on: boolean): void {
+  const crowd = ctx.peek<{ root: THREE.Object3D }>('crowd');
+  if (crowd) crowd.root.visible = on;
+}
+
+function posePlayer(ctx: Ctx, x: number, z: number, yaw: number, pitch: number, view: 'fps' | 'trainer'): void {
+  showCrowd(ctx, true);
+  const p = ctx.peek<any>('player');
+  if (!p) return;
+  p.teleport(x, z, yaw);
+  p.pitch = pitch;
+  p.viewMode = view;
+  if (p.mesh) p.mesh.visible = view === 'trainer';
+  const digimon = ctx.peek<any>('digimon');
+  digimon?.snapToPlayer?.();
+}
+
+/** Arranca un combate congelado en el menú (la cámara la lleva `battle`). */
+function startBattle(ctx: Ctx, species: string): void {
+  const battle = ctx.peek<{ start(req: object): void }>('battle');
+  battle?.start({ enemySpecies: species, enemyLevel: 4, seed: 7, hold: true });
+}
+
+function fixed(px: number, py: number, pz: number, tx: number, ty: number, tz: number, fov = 60): ShotPose {
+  return { position: new THREE.Vector3(px, py, pz), target: new THREE.Vector3(tx, ty, tz), fov };
+}
+
+export const SHOTS: Record<string, Shot> = {
+  'golden-fps': {
+    label: 'GOLDEN 17:00 — FPS from the south zebra looking north',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 2, 16, 0.12, -0.06, 'fps');
+      return null;
+    },
+  },
+  'golden-trainer': {
+    label: 'GOLDEN 17:00 — third person with partner',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 12, 0, -0.1, 'trainer');
+      return null;
+    },
+  },
+  'golden-top': {
+    label: 'GOLDEN 17:00 — aerial view of the X crossing',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 12, 0, 0, 'trainer');
+      return fixed(0, 88, 78, 0, 0, -8, 50);
+    },
+  },
+  'night-fps': {
+    label: 'NIGHT 21:30 — FPS from the south zebra looking north',
+    apply(ctx) {
+      setHour(ctx, NIGHT_HOUR);
+      posePlayer(ctx, 2, 16, 0.12, -0.02, 'fps');
+      return null;
+    },
+  },
+  'night-trainer': {
+    label: 'NIGHT 21:30 — third person with partner',
+    apply(ctx) {
+      setHour(ctx, NIGHT_HOUR);
+      posePlayer(ctx, 0, 12, 0, -0.1, 'trainer');
+      return null;
+    },
+  },
+  'battle-golden': {
+    label: 'GOLDEN 17:00 — E33 battle on the crossing, menu',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 3, 12, 0.1, 0, 'trainer');
+      startBattle(ctx, 'koromon');
+      return null;
+    },
+  },
+  'battle-night': {
+    label: 'NIGHT 21:30 — E33 battle on the crossing, menu',
+    apply(ctx) {
+      setHour(ctx, NIGHT_HOUR);
+      posePlayer(ctx, 3, 12, 0.1, 0, 'trainer');
+      startBattle(ctx, 'bukamon');
+      return null;
+    },
+  },
+  'partner-agumon': {
+    label: 'GOLDEN 17:00 — Agumon portrait',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 14, 0, 0, 'fps');
+      const d = ctx.peek<any>('digimon');
+      d?.showcase?.('agumon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(1.4, 1.2, 9.2, 0, 0.75, 6, 38);
+    },
+  },
+  'people-closeup': {
+    label: 'GOLDEN 17:00 — trainer and crowd close-up',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 3, 12, Math.PI, 0, 'trainer');
+      return fixed(3.4, 1.05, 14.6, 3, 0.75, 12, 40);
+    },
+  },
+  'partner-patamon': {
+    label: 'GOLDEN 17:00 — Patamon portrait',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 14, 0, 0, 'fps');
+      const d = ctx.peek<any>('digimon');
+      d?.showcase?.('patamon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(1.4, 1.5, 9.9, 0, 1.05, 6, 40);
+    },
+  },
+  'profile-agumon': {
+    label: 'GOLDEN 17:00 — Agumon side profile (model sheet check)',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 14, 0, 0, 'fps');
+      ctx.peek<any>('digimon')?.showcase?.('agumon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(3.6, 0.9, 6.2, 0, 0.7, 6, 36);
+    },
+  },
+  'profile-patamon': {
+    label: 'GOLDEN 17:00 — Patamon side profile (model sheet check)',
+    apply(ctx) {
+      setHour(ctx, GOLDEN_HOUR);
+      posePlayer(ctx, 0, 14, 0, 0, 'fps');
+      ctx.peek<any>('digimon')?.showcase?.('patamon', new THREE.Vector3(0, 0, 6));
+      showCrowd(ctx, false);
+      return fixed(3.8, 1.2, 6.2, 0, 1.0, 6, 38);
+    },
+  },
+};

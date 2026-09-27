@@ -1,0 +1,149 @@
+/* src/ui/battle.css — HUD del combate E33 (lo pinta ui/Hud.ts desde eventos battle:*) */
+
+#battle-ui { position: absolute; inset: 0; z-index: 20; pointer-events: none; }
+
+.bt-card {
+  position: absolute;
+  background: rgba(10, 16, 32, 0.78);
+  border: 1px solid rgba(77, 225, 255, 0.45);
+  border-radius: 14px;
+  padding: 10px 14px;
+  min-width: 260px;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px rgba(0, 8, 24, 0.5);
+}
+#bt-foe { top: 18px; right: 18px; border-color: rgba(255, 77, 200, 0.55); }
+#bt-ally { bottom: 22px; left: 22px; min-width: 320px; }
+.bt-name { display: flex; justify-content: space-between; font-size: 15px; font-weight: 900; letter-spacing: 0.5px; margin-bottom: 6px; }
+.bt-lv { color: var(--neon-yellow); font-size: 11px; font-weight: 800; }
+.bt-row { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 10px; font-weight: 800; letter-spacing: 1px; }
+.bt-row > span:first-child { width: 34px; color: var(--text-dim); }
+.bt-row .hud-bar { height: 9px; }
+.bt-num { min-width: 58px; text-align: right; font-size: 11px; color: var(--text); }
+.hud-bar-fill.brk { background: linear-gradient(90deg, #37e0ff, #b6f6ff); box-shadow: 0 0 8px rgba(55, 224, 255, 0.7); }
+.hud-bar-fill.grd { background: linear-gradient(90deg, #ff4dc8, #ffd24a); box-shadow: 0 0 8px rgba(255, 77, 200, 0.7); }
+.hud-bar-fill.grd.full { animation: grdPulse 0.6s ease-in-out infinite alternate; }
+@keyframes grdPulse { to { filter: brightness(1.5); } }
+.bt-pips { display: flex; gap: 4px; }
+.bt-pips i { width: 11px; height: 11px; border-radius: 3px; transform: rotate(45deg); background: rgba(255, 255, 255, 0.12); display: block; }
+.bt-pips i.on { background: #4de1ff; box-shadow: 0 0 8px #4de1ff; }
+.bt-badge { display: inline-block; margin-left: 8px; padding: 1px 7px; border-radius: 6px; background: #37e0ff; color: #04121c; font-size: 10px; font-weight: 900; }
+
+#bt-banner {
+  position: absolute; top: 16%; left: 50%; transform: translateX(-50%);
+  background: rgba(10, 14, 26, 0.82);
+  border: 1px solid rgba(255, 210, 74, 0.8);
+  color: #ffe9a8;
+  padding: 9px 22px; border-radius: 22px;
+  font-size: 15px; font-weight: 800; letter-spacing: 0.4px;
+  text-shadow: 0 0 10px rgba(255, 210, 74, 0.45);
+  max-width: 70%; text-align: center; white-space: nowrap;
+}
+
+#bt-menu {
+  position: absolute; bottom: 22px; right: 22px;
+  width: 360px;
+  pointer-events: auto;
+  background: rgba(10, 16, 32, 0.82);
+  border: 1px solid rgba(77, 225, 255, 0.5);
+  border-radius: 16px;
+  padding: 12px;
+  backdrop-filter: blur(14px);
+}
+.bt-menu-title { font-size: 12px; font-weight: 900; letter-spacing: 1.5px; color: var(--text-dim); margin: 0 4px 8px; }
+.bt-btn {
+  display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px;
+  width: 100%;
+  background: rgba(12, 20, 36, 0.9);
+  border: 1px solid rgba(77, 225, 255, 0.35);
+  color: #e8f4ff;
+  padding: 8px 10px; margin-bottom: 5px;
+  border-radius: 9px;
+  font: inherit; font-size: 13px; font-weight: 700; text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.bt-btn:hover:not(:disabled) { background: rgba(77, 225, 255, 0.16); border-color: #4de1ff; }
+.bt-btn:disabled { opacity: 0.38; cursor: default; }
+.bt-btn kbd { font: inherit; font-size: 10px; font-weight: 900; color: #04121c; background: #4de1ff; border-radius: 4px; text-align: center; padding: 1px 0; }
+.bt-btn .bt-cost { font-size: 11px; color: var(--neon-yellow); }
+.bt-btn.special { border-color: rgba(255, 77, 200, 0.55); }
+.bt-btn.special kbd { background: #ff4dc8; }
+.bt-split { display: grid; grid-template-columns: 1fr 1fr; gap: 0 5px; }
+
+/* ---- Defend timing bar ------------------------------------------------ */
+#bt-defend {
+  position: absolute; top: 58%; left: 50%; transform: translate(-50%, -50%);
+  width: min(560px, 70vw); text-align: center;
+}
+#bt-prompt {
+  font-size: 15px; font-weight: 900; letter-spacing: 4px; color: #6ef0ff; margin-bottom: 8px;
+  text-shadow: 0 0 12px rgba(110, 240, 255, 0.8);
+}
+#bt-prompt.now { color: #ffd24a; text-shadow: 0 0 16px rgba(255, 210, 74, 0.95); animation: bt-pulse 0.18s ease-out; }
+#bt-track {
+  position: relative; height: 46px; border-radius: 12px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(8, 12, 26, 0.92), rgba(16, 22, 44, 0.92));
+  border: 2px solid rgba(110, 240, 255, 0.55);
+  box-shadow: 0 0 18px rgba(77, 225, 255, 0.35), inset 0 0 14px rgba(0, 0, 0, 0.6);
+}
+#bt-fill {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
+  background: repeating-linear-gradient(115deg, rgba(110, 240, 255, 0.28) 0 10px, rgba(110, 240, 255, 0.12) 10px 20px);
+  background-size: 40px 100%; animation: bt-stripes 0.5s linear infinite;
+}
+.bt-lane { position: absolute; left: 0; right: 0; }
+.bt-lane > i {
+  position: absolute; top: 2px; bottom: 2px; border-radius: 5px;
+  background: rgba(77, 225, 255, 0.45); box-shadow: 0 0 10px rgba(77, 225, 255, 0.6);
+}
+.bt-lane > i.perfect { background: rgba(255, 210, 74, 0.75); box-shadow: 0 0 12px rgba(255, 210, 74, 0.9); }
+.bt-lane.gradient > i { background: rgba(255, 77, 200, 0.5); box-shadow: 0 0 10px rgba(255, 77, 200, 0.7); }
+.bt-lane > b {
+  position: absolute; left: 6px; top: 50%; transform: translateY(-50%);
+  font-size: 9px; font-weight: 900; letter-spacing: 1px; color: rgba(230, 240, 255, 0.85);
+}
+#bt-impact {
+  position: absolute; top: -2px; bottom: -2px; width: 3px; margin-left: -1.5px;
+  background: #fff; box-shadow: 0 0 10px #fff, 0 0 18px #ffd24a;
+}
+#bt-cursor {
+  position: absolute; top: -4px; bottom: -4px; width: 4px; margin-left: -2px; left: 0%;
+  background: #ffffff; border-radius: 2px; box-shadow: 0 0 12px #6ef0ff, 0 0 4px #fff;
+}
+#bt-press {
+  position: absolute; top: -6px; bottom: -6px; width: 6px; margin-left: -3px; border-radius: 3px; display: none;
+}
+#bt-defend.perfect #bt-press { display: block; background: #ffd24a; box-shadow: 0 0 16px #ffd24a; }
+#bt-defend.good #bt-press { display: block; background: #6ef0ff; box-shadow: 0 0 16px #6ef0ff; }
+#bt-defend.miss #bt-press { display: block; background: #ff4d6d; box-shadow: 0 0 16px #ff4d6d; }
+#bt-defend.perfect #bt-track { border-color: #ffd24a; box-shadow: 0 0 30px rgba(255, 210, 74, 0.9); }
+#bt-defend.good #bt-track { border-color: #6ef0ff; box-shadow: 0 0 26px rgba(110, 240, 255, 0.9); }
+#bt-defend.miss #bt-track { border-color: #ff4d6d; box-shadow: 0 0 26px rgba(255, 77, 109, 0.85); animation: bt-shake 0.28s ease-out; }
+.bt-keys { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+.bt-keys span { background: rgba(10, 14, 26, 0.85); border: 1px solid #4de1ff; border-radius: 8px; padding: 5px 10px; font-size: 12px; font-weight: 800; }
+.bt-keys b { color: #4de1ff; margin-right: 5px; }
+#bt-result { margin-top: 8px; font-size: 30px; font-weight: 900; letter-spacing: 3px; min-height: 36px; }
+#bt-defend.perfect #bt-result { color: #ffd24a; text-shadow: 0 0 18px rgba(255, 210, 74, 0.95); animation: bt-pop 0.3s ease-out; }
+#bt-defend.good #bt-result { color: #6ef0ff; text-shadow: 0 0 16px rgba(110, 240, 255, 0.9); animation: bt-pop 0.3s ease-out; }
+#bt-defend.miss #bt-result { color: #ff6b8a; text-shadow: 0 0 16px rgba(255, 59, 107, 0.85); animation: bt-pop 0.3s ease-out; }
+@keyframes bt-stripes { to { background-position: 40px 0; } }
+@keyframes bt-pop { 0% { transform: scale(1.6); opacity: 0; } 60% { transform: scale(0.94); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes bt-pulse { 0% { transform: scale(1.3); } 100% { transform: scale(1); } }
+@keyframes bt-shake {
+  0%, 100% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(7px); }
+  60% { transform: translateX(-5px); } 80% { transform: translateX(3px); }
+}
+
+#bt-reticle {
+  position: fixed; width: 54px; height: 54px; margin: -27px 0 0 -27px;
+  border: 2px solid #6ef0ff; border-radius: 50%;
+  box-shadow: 0 0 14px rgba(110, 240, 255, 0.8);
+  pointer-events: none;
+}
+#bt-reticle::before, #bt-reticle::after { content: ''; position: absolute; background: #6ef0ff; }
+#bt-reticle::before { left: 50%; top: -8px; bottom: -8px; width: 2px; margin-left: -1px; }
+#bt-reticle::after { top: 50%; left: -8px; right: -8px; height: 2px; margin-top: -1px; }
+#bt-aim-catch { position: fixed; inset: 0; pointer-events: auto; cursor: none; }
+
+#bt-flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 0.35s ease-out; }

@@ -1,0 +1,6 @@
+[
+  ["`Sistema sin static id: ${sys.constructor.name}`", "`System without a static id: ${sys.constructor.name}`"],
+  ["`Ciclo de dependencias: ${[...trail, id].join(' -> ')}`", "`Dependency cycle: ${[...trail, id].join(' -> ')}`"],
+  ["`Sistema '${id}' depende de '${dep}', que no está registrado`", "`System '${id}' depends on '${dep}', which is not registered`"],
+  ["'Sistema inválido: necesita init(ctx)'", "'Invalid system: init(ctx) is required'"]
+]
