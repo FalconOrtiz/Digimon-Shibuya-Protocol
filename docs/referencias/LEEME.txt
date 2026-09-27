@@ -28,7 +28,7 @@ ACTUALIZACION 3 (estilo cartoon Pokemon/Animal Crossing):
 - Ropa NPCs: 10 colores vibrantes (rosa, azul, verde, naranja, lila, turquesa...)
 - Hora inicio: 17:00 (atardecer calido)
 
-ACTUALIZACION 4 (assets de personajes desde Desktop/DIGIMON):
+ACTUALIZACION 4 (assets de personajes en este repositorio):
 - Assets copiados a docs/referencias/assets/ (agumon, patamon, digivice, digiegg, items, shibuya x2)
 - AGUMON (Orange Dino Partner): cuerpo naranja #e08030, OJOS VERDES #2ec44a, garras blancas #f8f8f2
 - PATAMON (Wing-Ear Mammal Partner): cuerpo CREMA #f0e0c8, orejas naranja #e08030,
@@ -43,12 +43,10 @@ ACTUALIZACION 5 (sprites de digimons en el mundo):
 - El rival (Ren) tambien usa sprite
 - Los salvajes (koromon/nyaromon/bukamon) siguen con modelos 3D (sin referencia de imagen)
 
-ACTUALIZACION 6 (assets de alta calidad + reubicacion):
-- MAESTRO DE ASSETS: D:\DIGIMON-ASSETS (7 archivos, md5 verificado)
-- BACKUP PROYECTO: D:\DIGIMON-BACKUP (111MB con node_modules)
-- Desktop/DIGIMON (C:) ELIMINADO -> papelera (todo verificado en D antes)
-- Assets nuevos: agumon01.png / patamon01.png (RGBA con transparencia nativa,
+ACTUALIZACION 6 (assets de alta calidad en este repositorio):
+- Autor: Falcon Ortiz. Repo: FalconOrtiz/Digimon-Shibuya-Protocol.
+- Assets en docs/referencias/assets y sprites en public/assets.
+- Assets: agumon01.png / patamon01.png (RGBA con transparencia nativa,
   sin chroma key), digihuevo01.png, digivice01.jpg, items01.png
 - Sprites del juego regenerados desde los PNG de alta calidad (502x722, 563x586)
-- Regla: los assets viven en D:\DIGIMON-ASSETS (maestro) + docs/referencias/assets
-  (en repo). C: NO debe contener duplicados.
+- Regla: los assets de este juego viven en este repositorio.

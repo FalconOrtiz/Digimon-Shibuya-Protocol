@@ -1,7 +1,7 @@
 # DIGIMON: SHIBUYA PROTOCOL — ART BIBLE (Regla Gráfica)
 
-> Contrato visual derivado del análisis por píxeles de las referencias
-> (Desktop/DIGIMON/shibuya crossing senital.jpg + first person.jpg).
+> Contrato visual de este repositorio. Autor: Falcon Ortiz.
+> Referencias en `docs/referencias/`.
 > Todo cambio visual DEBE respetar esta regla. Verificación: análisis de
 > histograma contra las referencias (docs/smoke-artcheck.mjs).
 
@@ -68,8 +68,9 @@ sombras; materiales con metalness>0 SIN environment map renderizan casi negro
 suelo/calles, ambient SIEMPRE ≥ 0.7, fill light opuesta al sol para las fachadas,
 y spawn del jugador en el centro del cruce (ref: "standing in the middle").
 
-## 7. Proceso (herencia Claude-of-Duty / Matt)
+## 7. Proceso (este repositorio)
 
+- Autor: Falcon Ortiz. Repositorio: FalconOrtiz/Digimon-Shibuya-Protocol.
 - Subsistemas con dueño único, contrato vía ctx (cero imports cruzados).
 - RNG determinista, cero alloc per frame, dispose.
 - Sin assets externos salvo las referencias de personajes (sprites).

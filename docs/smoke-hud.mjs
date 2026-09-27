@@ -1,5 +1,8 @@
 // verificación del nuevo HUD (perfil + inventario) según el prompt de referencia
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -39,6 +42,6 @@ await page.evaluate(() => {
   cam.rotation.z = 0;
 });
 await page.waitForTimeout(600);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-hud.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-hud.png') });
 console.log('ERRORS:', errors.length ? errors.join(' | ') : '(ninguno)');
 await browser.close();

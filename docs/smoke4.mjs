@@ -1,5 +1,8 @@
 // verificación de escena: qué hay realmente en el mundo 3D
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -41,7 +44,7 @@ await page.evaluate(() => {
   cam.lookAt(0, 0, 0);
 });
 await page.waitForTimeout(500);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-top.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-top.png') });
 
 // screenshot con cámara a ras de suelo mirando al cruce
 await page.evaluate(() => {
@@ -51,6 +54,6 @@ await page.evaluate(() => {
   cam.lookAt(0, 1.5, 0);
 });
 await page.waitForTimeout(500);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-street.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-street.png') });
 console.log('screenshots guardados');
 await browser.close();

@@ -1,5 +1,7 @@
 # DIGIMON: SHIBUYA PROTOCOL — engine contract
 
+Autor: Falcon Ortiz. Repositorio: https://github.com/FalconOrtiz/Digimon-Shibuya-Protocol
+
 **Cada agente debe leer esto antes de escribir código. Es el único mecanismo de coordinación.**
 
 Target: fan game FPS en el cruce de Shibuya (Three.js r180+ / WebGL2), combate por

@@ -1,6 +1,9 @@
 // smoke-artcheck.mjs — captura para el crítico adversarial de la Art Bible.
 // El análisis de píxeles lo hace smoke-artcheck.py (mismo pipeline que referencias).
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -20,6 +23,6 @@ await page.evaluate(() => {
   cam.rotation.z = 0;
 });
 await page.waitForTimeout(800);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/artcheck-shot.png' });
+await page.screenshot({ path: join(docsDir, 'artcheck-shot.png') });
 console.log('ERRORS:', errors.length ? errors.join(' | ') : '(ninguno)');
 await browser.close();

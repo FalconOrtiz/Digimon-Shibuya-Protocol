@@ -1,5 +1,5 @@
 // src/digimon/sprites.js — digimons como billboards con las imágenes de referencia.
-// En exploración se muestra el sprite (fiel a las referencias de Desktop/DIGIMON);
+// En exploración se muestra el sprite (docs/referencias/assets de este repo);
 // en batalla el sistema alterna al modelo 3D animado (models.js).
 
 import * as THREE from 'three';

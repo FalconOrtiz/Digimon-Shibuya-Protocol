@@ -1,5 +1,8 @@
 // verificación: sprites de digimons en el mundo + alternancia en batalla
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -19,7 +22,7 @@ await page.evaluate(() => {
   cam.lookAt(m.model.position.x, 0.9, m.model.position.z);
 });
 await page.waitForTimeout(500);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-agumon-sprite.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-agumon-sprite.png') });
 
 // entrar en batalla → el modelo 3D debe aparecer (sprite oculto)
 await page.evaluate(() => {

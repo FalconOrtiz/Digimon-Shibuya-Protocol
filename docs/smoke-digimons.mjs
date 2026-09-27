@@ -1,5 +1,8 @@
 // captura de los digimons actualizados según las referencias
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -20,7 +23,7 @@ await page.evaluate(() => {
   cam.lookAt(m.position.x, 1.0, m.position.z);
 });
 await page.waitForTimeout(500);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-agumon.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-agumon.png') });
 
 // Patamon
 await page.evaluate(() => {
@@ -33,7 +36,7 @@ await page.evaluate(() => {
   cam.lookAt(m.position.x, 1.0, m.position.z);
 });
 await page.waitForTimeout(500);
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-patamon.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-patamon.png') });
 
 console.log('ERRORS:', errors.length ? errors.join(' | ') : '(ninguno)');
 await browser.close();

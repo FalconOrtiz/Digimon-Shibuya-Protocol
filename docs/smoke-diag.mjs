@@ -1,5 +1,8 @@
 // diagnóstico de iluminación: mediodía vs hora azul, vista cenital del cruce
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -19,7 +22,7 @@ async function shot(hour, name) {
     cam.rotation.z = 0;
   }, hour);
   await page.waitForTimeout(800);
-  await page.screenshot({ path: `D:/digimon-shibuya-protocol/docs/diag-${name}.png` });
+  await page.screenshot({ path: join(docsDir, `diag-${name}.png`) });
 }
 
 await shot(12.0, 'noon');

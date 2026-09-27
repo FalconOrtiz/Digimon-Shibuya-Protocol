@@ -5,8 +5,9 @@
 **Goal:** FPS fan game en Three.js en el cruce de Shibuya con combate por turnos
 estilo Expedition 33 (QTE timing), 2 digimons chibi procedurales y Digivice completo.
 
-**Architecture:** Subsistemas con dueño único y contrato vía ctx (herencia
-Claude-of-Duty). Sin assets: todo procedural. Vite + three ESM.
+**Architecture:** Subsistemas con dueño único y contrato vía ctx en este
+repositorio. Sin assets: todo procedural. Vite + three ESM.
+**Author:** Falcon Ortiz. Repo: FalconOrtiz/Digimon-Shibuya-Protocol.
 
 **Tech Stack:** Vite 7, three r180, WebGL2, DOM/CSS UI, Web Audio, playwright/pngjs (tools).
 
@@ -15,18 +16,18 @@ Claude-of-Duty). Sin assets: todo procedural. Vite + three ESM.
 ## Fase 0 — Scaffold
 
 ### Task 0.1: Crear package.json + vite + index.html
-- Create: `D:\digimon-shibuya-protocol\package.json` (name digimon-shibuya-protocol,
+- Create: `package.json` (name digimon-shibuya-protocol,
   type module, scripts: dev/build/preview/shot; deps: three ^0.180.0; devDeps:
   vite ^7, playwright, pngjs)
-- Create: `D:\digimon-shibuya-protocol\vite.config.js`
-- Create: `D:\digimon-shibuya-protocol\index.html` (canvas #c, import map NOT needed
+- Create: `vite.config.js`
+- Create: `index.html` (canvas #c, import map NOT needed
   with Vite, module main.js, styles.css)
-- Create: `D:\digimon-shibuya-protocol\ARCHITECTURE.md` (contrato, copia adaptada)
+- Create: `ARCHITECTURE.md` (contrato de este repositorio)
 - Run: `npm install` → expected: found 0 vulnerabilities
 - Run: `npm run build` → expected: build OK
 
-### Task 0.2: Copiar tools de verificación desde Claude-of-Duty
-- Copy: `D:\Claude-of-Duty\tools\*.mjs` → `D:\digimon-shibuya-protocol\tools\`
+### Task 0.2: Tools de verificación de este repositorio
+- Keep: `tools/*.mjs` en este repositorio
 - Adjust paths (package name, port) en capture.mjs/shotset.mjs/baseline.mjs
 - Run: `node tools/playtest.mjs` → expected: passes (boots game headless)
 

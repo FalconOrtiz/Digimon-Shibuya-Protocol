@@ -31,10 +31,9 @@ QTE de timing (perfect parry / golden-zone crit), todo accesible desde un Digivi
 - Combate: turnos + QTE timing + parry/dodge + habilidades por digimon.
 - Digivice: inventario, mapa, digimons, perfil, salud/stamina, digihuevos.
 - Audio: síntesis Web Audio (sin archivos).
-- Verificación: tools/ de capture/baseline/imagediff/playtest copiadas de
-  Claude-of-Duty (D:\Claude-of-Duty\tools).
+- Verificación: `tools/` de este repositorio (capture, baseline, imagediff, playtest).
 
-## Arquitectura (herencia de Claude-of-Duty)
+## Arquitectura
 
 Subsistemas con dueño único, contrato vía `ctx`, eventos cross-subsistema,
 rng determinista, cero alloc per frame, dispose. Sin dependencias nuevas (solo three).
@@ -87,8 +86,8 @@ fixedUpdate/update/lateUpdate/resize/dispose, `ctx.get(id)`, `ctx.events`,
 ## Plataforma
 
 - Vite + three (ESM), `npm run dev` en http://127.0.0.1:5173.
-- Windows host; repo en D:\digimon-shibuya-protocol.
-- Git: commits locales, push solo con OK (regla del usuario).
+- Windows host. Repositorio: https://github.com/FalconOrtiz/Digimon-Shibuya-Protocol
+- Autor: Falcon Ortiz.
 
 ## Fuera de scope (futuro)
 

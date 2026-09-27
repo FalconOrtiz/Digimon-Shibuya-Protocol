@@ -1,5 +1,8 @@
 // smoke test v3: estado completo + screenshot del juego funcionando
 import { chromium } from 'playwright';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+const docsDir = dirname(fileURLToPath(import.meta.url));
 
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -33,6 +36,6 @@ const state = await page.evaluate(() => {
   };
 });
 console.log('STATE:', JSON.stringify(state, null, 2));
-await page.screenshot({ path: 'D:/digimon-shibuya-protocol/docs/screenshot-day.png' });
+await page.screenshot({ path: join(docsDir, 'screenshot-day.png') });
 console.log('ERRORS:', errors.length ? errors.join(' | ') : '(ninguno)');
 await browser.close();
